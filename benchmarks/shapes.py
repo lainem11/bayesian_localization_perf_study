@@ -4,10 +4,7 @@ from pathlib import Path
 import torch
 import numpy as np
 
-def make_session(seed, source_vertex=2679):
-
-    torch.manual_seed(seed)   # generate_source and simulate_response use torch.rand
-    np.random.seed(seed)
+def make_session(source_vertex=2679):
 
     def _find_repo_root():
         for p in [Path.cwd(), *Path.cwd().parents]:

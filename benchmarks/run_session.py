@@ -31,7 +31,6 @@ def parse_args():
     p.add_argument("--trials", type=int, default=50, help="number of trials")
     p.add_argument("--warmup", type=int, default=1, help="warmup iterations (K)")
     p.add_argument("--repeats", type=int, default=1, help="session repeats (R)")
-    p.add_argument("--seed", type=int, default=0, help="random seed (S).")
     p.add_argument("--out", type=Path, default=Path("results.json"), help="output path")
     return p.parse_args()
 
@@ -44,7 +43,7 @@ if __name__ == "__main__":
         results = defaultdict(list)
 
         # Initialize a LocalizationSession
-        S = make_session(args.seed)
+        S = make_session()
 
         # Run warmup
         ses_t0 = time.perf_counter()
