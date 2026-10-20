@@ -48,3 +48,5 @@ if __name__ == "__main__":
     print(f"efield_trials; {get_tensor_info(S.data_handler.efield_trials)}.<br>")
     print(f"ROI length: {len(S.mesh.ROI)}.<br>")
     print(f"Number of coils: {S.optimizer.n_coils}.<br>")
+
+    S.end_session()

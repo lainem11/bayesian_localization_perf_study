@@ -90,6 +90,8 @@ if __name__ == "__main__":
 
         all_runs.append(dict(results))
 
+        S.end_session()
+
     # Produce an output JSON
     output = {
         "env": collect_env(),
