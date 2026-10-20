@@ -1,0 +1,41 @@
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                               localize         0.00%       0.000us         0.00%       0.000us       0.000us        2.733s      1333.37%        2.733s     910.909ms             3  
+                               Optimizer.step#Adam.step         0.00%       0.000us         0.00%       0.000us       0.000us     514.629ms       251.10%     514.629ms       1.144ms           450  
+                                               localize        38.40%        1.474s        71.25%        2.735s     911.717ms       0.000us         0.00%     127.161ms      42.387ms             3  
+                               Optimizer.step#Adam.step         5.17%     198.522ms        14.90%     572.005ms       1.271ms       0.000us         0.00%      62.830ms     139.622us           450  
+                                              aten::mul         5.12%     196.677ms        13.00%     499.180ms      20.504us      46.469ms        22.67%      46.476ms       1.909us         24345  
+      autograd::engine::evaluate_function: MulBackward0         1.59%      60.976ms         9.07%     348.003ms      42.963us       0.000us         0.00%      31.832ms       3.930us          8100  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us      19.693ms         9.61%      19.693ms       1.456us         13524  
+void at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us      19.306ms         9.42%      19.306ms       3.054us          6321  
+                                           MulBackward0         0.43%      16.601ms         5.20%     199.567ms      24.638us       0.000us         0.00%      19.283ms       2.381us          8100  
+                                             aten::mean         1.03%      39.649ms         2.20%      84.410ms      26.797us      13.971ms         6.82%      13.991ms       4.442us          3150  
+void at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us      13.971ms         6.82%      13.971ms       4.435us          3150  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us      13.359ms         6.52%      13.359ms       1.645us          8121  
+                                aten::_foreach_addcdiv_         0.34%      12.916ms         1.16%      44.471ms      16.471us      12.245ms         5.97%      12.254ms       4.539us          2700  
+    autograd::engine::evaluate_function: ClampBackward1         0.24%       9.078ms         3.94%     151.405ms     112.152us       0.000us         0.00%      12.252ms       9.076us          1350  
+                                         ClampBackward1         0.30%      11.547ms         3.71%     142.327ms     105.427us       0.000us         0.00%      12.252ms       9.076us          1350  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us      12.245ms         5.97%      12.245ms       4.535us          2700  
+      autograd::engine::evaluate_function: PowBackward0         0.34%      13.114ms         5.48%     210.245ms      77.869us       0.000us         0.00%      11.568ms       4.284us          2700  
+                                           PowBackward0         0.32%      12.282ms         5.14%     197.131ms      73.012us       0.000us         0.00%      11.568ms       4.284us          2700  
+                                              aten::div         1.46%      56.043ms         3.40%     130.327ms      22.176us      11.422ms         5.57%      11.422ms       1.944us          5877  
+                                              aten::sum         0.59%      22.481ms         1.37%      52.715ms      19.481us       9.833ms         4.80%       9.833ms       3.634us          2706  
+void at::native::reduce_kernel<128, 4, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us       9.819ms         4.79%       9.819ms       3.632us          2703  
+                                              aten::add         1.08%      41.599ms         2.65%     101.812ms      18.781us       9.590ms         4.68%       9.591ms       1.769us          5421  
+                                    aten::_foreach_div_         0.32%      12.472ms         1.05%      40.308ms      14.929us       9.038ms         4.41%       9.038ms       3.347us          2700  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us       9.038ms         4.41%       9.038ms       3.347us          2700  
+                                    aten::_foreach_sqrt         0.42%      15.931ms         1.61%      61.980ms      22.955us       8.826ms         4.31%       8.826ms       3.269us          2700  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us       8.826ms         4.31%       8.826ms       3.269us          2700  
+                                   aten::_foreach_lerp_         0.49%      18.682ms         1.75%      67.185ms      24.883us       8.640ms         4.22%       8.640ms       3.200us          2700  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us       8.640ms         4.22%       8.640ms       3.200us          2700  
+                                aten::_foreach_addcmul_         0.36%      13.964ms         1.06%      40.782ms      15.104us       8.547ms         4.17%       8.547ms       3.165us          2700  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us       8.547ms         4.17%       8.547ms       3.165us          2700  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 3.839s
+Self CUDA time total: 204.949ms
+
+cudaLaunchKernel               calls=85809    cpu_total=1006.1 ms
+aten::item                     calls=6312     cpu_total=28.7 ms
+aten::_local_scalar_dense      calls=6312     cpu_total=23.6 ms
+cudaStreamSynchronize          calls=465      cpu_total=10.7 ms

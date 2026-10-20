@@ -41,3 +41,9 @@ I now have a reproducible benchmark harness. The results file records the enviro
 On the benchmark system, `localize()` has a 0.586 s median per trial (IQR 0.020) and `choose_next_stimulus` a 0.340 s (IQR 0.001). Each session is around 50 s.
 
 First trial costs split into JIT recompilation in every session (~3.7 s) and PyTorch initializations.
+
+# Profiling
+
+## localize()
+
+Running the script `profile_localize.py` run PyTorch Profiler to calculate CPU and CUDA durations for various functions calls inside the `localize()` function. I ran called the `localize()` function three times. The profiling slows down the execution somewhat, with 3.709/3 = 1.236 s duration per call compared to 0.5863 recorded at the baseline. Most of the time goes outside the kernels, in native Python. A total of 85809 CUDA kernels were launched, with about 970 ms / 85809 = 11 us of CPU time and 206 ms / 85809 = 2.4 us of GPU time per kernel. Therefore, CPU dominates the per-kernel times. The Adam step uses on average 1.223 ms of CPU time versus 140 us of GPU time. So GPU is busy roughly 10% of the time. The computation is launch-bound and the fix is to send fewer launches and less Python per step. We also see that cudaStreamSynchronize has a total CPU time of 9.4 ms. This around 1% of the total kernel time, so the sync is not a bottleneck to the performance here.
