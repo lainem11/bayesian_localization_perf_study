@@ -231,8 +231,12 @@ class LocalizationSession:
         self.visualizer.stop_plotter()
         gc.collect()
         jax.clear_caches()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if self.device.type == 'cuda':
+            try:
+                torch.cuda.empty_cache()
+            except AttributeError:
+                # Raised when __del__ runs during interpreter shutdown, after torch.cuda is torn down
+                pass
         if not self.silent_mode:
             print("Session ended.")
             
