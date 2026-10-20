@@ -14,7 +14,8 @@ def collect_env():
     my_dict = dict()
     my_dict["GIT branch"] = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True).strip()
     my_dict["GIT commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-
+    my_dict["GIT dirty"] = bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
+    
     cmd = ["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader,nounits"]
     output = subprocess.check_output(cmd, text=True).strip()
     model, driver = output.split(',')

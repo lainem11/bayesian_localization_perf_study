@@ -29,9 +29,9 @@ def to_jsonable(obj):
 def parse_args():
     p = argparse.ArgumentParser(description="Run a benchmark session.")
     p.add_argument("--trials", type=int, default=50, help="number of trials")
-    p.add_argument("--warmup", type=int, default=5, help="warmup iterations (K)")
+    p.add_argument("--warmup", type=int, default=1, help="warmup iterations (K)")
     p.add_argument("--repeats", type=int, default=1, help="session repeats (R)")
-    p.add_argument("--seed", type=int, default=0, help="random seed (S). Not implemented.")
+    p.add_argument("--seed", type=int, default=0, help="random seed (S).")
     p.add_argument("--out", type=Path, default=Path("results.json"), help="output path")
     return p.parse_args()
 
@@ -44,37 +44,12 @@ if __name__ == "__main__":
         results = defaultdict(list)
 
         # Initialize a LocalizationSession
-        S = make_session(2679)
+        S = make_session(args.seed)
 
         # Run warmup
         ses_t0 = time.perf_counter()
-        for i in range(S.trial_number, args.warmup):
 
-            results["trial number"].append(S.trial_number)
-
-            # Prepare for a new trial
-            S.start_trial()  
-
-            # Optimize the E-field pattern based on the current model
-            didt = S.choose_next_stimulus()
-            results["didt"].append(didt)
-            
-            S.record_efield_trial(didt)
-
-            # Recorded the stimulation-induced response
-            S.simulate_response()
-
-            # Use the measured data to localize the responses
-            S.localize()
-
-            # Get maximum probability index
-            max_prob_ind = torch.argmax(S.response_model.log_source_prob).item()
-            results["max prob. index"].append(max_prob_ind)
-
-            # Complete the trial
-            S.complete_trial()
-
-        # Run actual trials
+        # Run trials
         for i in range(S.trial_number, args.trials):
 
             results["trial number"].append(S.trial_number)
@@ -102,11 +77,14 @@ if __name__ == "__main__":
             max_prob_ind = torch.argmax(S.response_model.log_source_prob).item()
             results["max prob. index"].append(max_prob_ind)
 
+            # Get response function fitting steps
+            results["adam steps"].append(len(S.response_model.losses))
+
             # Complete the trial
             S.complete_trial()
 
         ses_t1 = time.perf_counter()
-        results["total session duration"].append(ses_t1)
+        results["total session duration"].append(ses_t1-ses_t0)
 
         responses = S.get_active_responses()
         results["responses"] = responses
@@ -129,6 +107,6 @@ if __name__ == "__main__":
     print(f"\nTiming summary over {n} trials (after {args.warmup} warm-up), seconds:")
     print(f"{'stage':<40}{'median':>10}{'IQR':>10}{'Q1':>10}{'Q3':>10}")
     for stage in stages:
-        vals = np.array([v for run in all_runs for v in run[stage]])
+        vals = np.array([v for run in all_runs for v in run[stage][args.warmup:]])
         q1, med, q3 = np.percentile(vals, [25, 50, 75])
         print(f"{stage:<40}{med:>10.4f}{q3 - q1:>10.4f}{q1:>10.4f}{q3:>10.4f}")

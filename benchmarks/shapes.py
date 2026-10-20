@@ -1,8 +1,14 @@
 from ABL import LocalizationSession, preprocessing
 import os
 from pathlib import Path
+import torch
+import numpy as np
 
-def make_session(seed):
+def make_session(seed, source_vertex=2679):
+
+    torch.manual_seed(seed)   # generate_source and simulate_response use torch.rand
+    np.random.seed(seed)
+
     def _find_repo_root():
         for p in [Path.cwd(), *Path.cwd().parents]:
             if (p / 'pyproject.toml').exists():
@@ -27,8 +33,7 @@ def make_session(seed):
     S = LocalizationSession(cortex=cortex, save_path=save_path, stimulator=stimulator, efield_set=E, device=device, silent_mode=True)
 
     # Add source point for simulating responses
-    source_ind = [seed]
-    S.generate_source(source_ind)
+    S.generate_source([source_vertex])
 
     return S
 
@@ -37,7 +42,7 @@ def get_tensor_info(tensor):
     return f"Shape: {tensor.shape}, dtype: {tensor.dtype}, device: {tensor.device}"
 
 if __name__ == "__main__":
-    seed=2679
+    seed=0
     S = make_session(seed)
     
     print(f"efield_set; {get_tensor_info(S.efield_model.efield_set)}, size: {S.efield_model.efield_set.element_size() * S.efield_model.efield_set.numel() / (1024 ** 2):.2f} MB.<br>")
