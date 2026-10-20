@@ -19,3 +19,12 @@ NumPyro version: 0.20.1<br>
 Python version: 3.13.16<br>
 OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43<br>
 
+## E-field tensor info
+
+efield_set; Shape: torch.Size([5, 7444, 3]), dtype: torch.float32, device: cuda:0, size: 0.43 MB.<br>
+efield_basis; Shape: torch.Size([7444, 3, 2]), dtype: torch.float32, device: cuda:0.<br>
+efield_null_dir_basis; Shape: torch.Size([1, 7444, 2]), dtype: torch.float32, device: cuda:0.<br>
+efield_trials; Shape: torch.Size([150, 7444, 3]), dtype: torch.float32, device: cuda:0.<br>
+efield_basis; Shape: torch.Size([7444, 3, 2]), dtype: torch.float32, device: cuda:0.<br>
+ROI length: 7444.<br>
+Number of coils: 5.<br>
