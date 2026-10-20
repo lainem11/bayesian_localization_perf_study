@@ -102,11 +102,17 @@ if __name__ == "__main__":
     print(f"Results written to {args.out}")
 
     # Summary of per-stage timings (only post-warmup trials are timed)
-    stages = [k for k in all_runs[0] if k.endswith("duration")]
-    n = len(all_runs[0][stages[0]]) * len(all_runs) if stages else 0
-    print(f"\nTiming summary over {n} trials (after {args.warmup} warm-up), seconds:")
+    # Per-trial stages only; "total session duration" has one entry per run
+    stages = [k for k in all_runs[0] if k.endswith("() duration")]
+    n = sum(len(run[stages[0]][args.warmup:]) for run in all_runs) if stages else 0
+    print(f"\nTiming summary over {n} trials (excluding first {args.warmup} per run), seconds:")
     print(f"{'stage':<40}{'median':>10}{'IQR':>10}{'Q1':>10}{'Q3':>10}")
     for stage in stages:
         vals = np.array([v for run in all_runs for v in run[stage][args.warmup:]])
+        if vals.size == 0:
+            print(f"{stage:<40}{'n/a (no trials after warm-up)':>40}")
+            continue
         q1, med, q3 = np.percentile(vals, [25, 50, 75])
         print(f"{stage:<40}{med:>10.4f}{q3 - q1:>10.4f}{q1:>10.4f}{q3:>10.4f}")
+    totals = [run["total session duration"][0] for run in all_runs]
+    print(f"{'total session duration (per run)':<40}{np.median(totals):>10.4f}")
