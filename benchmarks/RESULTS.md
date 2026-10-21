@@ -61,8 +61,10 @@ Running `profile_de.py` profiles a single run of the 200-step differential evolu
 ```
 python profile_de.py > results/profile_de_2026-10-21.txt
 ```
-The results show a median of 2.5 ms per optimization step when each step is synced. Without sync, an iteration averages just 1.5 ms. We can see the kernel stats from the XLA HLO dump, which can be formatted nicely with command:
+The results show a median of 2.5 ms per objective call when each step is synced. Without sync, an iteration averages just 1.5 ms. We can see the kernel stats from the XLA HLO dump, which can be formatted nicely with command:
 ```
 python hlo_traffic.py results/de_objective_hlo.txt > results/de_objective_traffic.txt
 ```
-The number of kernels launched was 22. A cuBLAS gemm kernel multiplies a [22332 x 5] matrix by [5 x 512] and gets [22332 x 512]: that is the E-field of every candidate at every vertex. This operation writes roughly 46 MB. The total read/write is 430 MB per call, which with the 1.541 ms duration 280 GB/s. This is close to the 4060 Ti limit of 288 GB/s, so the differential evolution may be memory-bound. The choose_next_stimulus() was timed to 0.3396 s, which is on average 1.7 ms per step. The objective evaluation thus takes most of the time during the optimization.
+The number of kernels launched was 22. A cuBLAS gemm kernel multiplies a [22332 x 5] matrix by [5 x 512] and gets [22332 x 512]: that is the E-field of every candidate at every vertex. This operation writes roughly 46 MB. The data sizes are estimated from the HLO by `hlo_traffic.py`, assumign each inputs and outputs are read/written once. A large chain of operations of E-field magnitude, angle, sigmoid, and logs are fused in to a single kernel: `loop_add_log_fusion`.
+
+The total read/write is 430 MB per call, which with the 1.541 ms duration 280 GB/s. This is close to the 4060 Ti limit of 288 GB/s, so the differential evolution may be memory-bound. The choose_next_stimulus() was timed to 0.3396 s, which is on average 1.7 ms per step. The objective evaluation thus takes around 90% of the time during the optimization.
