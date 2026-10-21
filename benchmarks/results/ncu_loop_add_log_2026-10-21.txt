@@ -1,0 +1,54 @@
+==PROF== Connected to process 1183 (/home/mikael/.local/share/uv/python/cpython-3.13.16-linux-x86_64-gnu/bin/python3.13)
+==PROF== Profiling "loop_add_log_fusion": 0%....50%....100% - 7 passes
+GIT branch: perf-study
+GIT commit: df9cc66bd8b05a9f692e0dc798783f53d2ed4bde
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+objective: median 2.773 ms, IQR 2.257 ms
+top-level kernels (fusion / custom-call): 22
+objective, back-to-back: 1.666 ms per call
+==PROF== Disconnected from process 1183
+[1183] python3.13@127.0.0.1
+  loop_add_log_fusion (7444, 1, 1)x(128, 1, 1), Context 1, Stream 13, Device 0, CC 8.9
+    Section: Command line profiler metrics
+    ---------------------- ----------- ------------
+    Metric Name            Metric Unit Metric Value
+    ---------------------- ----------- ------------
+    dram__bytes_read.sum         Mbyte        77.23
+    dram__bytes_write.sum        Mbyte        20.55
+    gpu__time_duration.sum          us       377.02
+    ---------------------- ----------- ------------
+
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz         8.74
+    SM Frequency                    Ghz         2.54
+    Elapsed Cycles                cycle       958370
+    Memory Throughput                 %        92.72
+    DRAM Throughput                   %        92.72
+    Duration                         us       377.02
+    L1/TEX Cache Throughput           %         9.23
+    L2 Cache Throughput               %        19.38
+    SM Active Cycles              cycle    894959.88
+    Compute (SM) Throughput           %        28.07
+    ----------------------- ----------- ------------
+
+    INF   This workload is utilizing greater than 80.0% of the available compute or memory performance of this device.  
+          To further improve performance, work will likely need to be shifted from the most utilized to another unit.   
+          Start by analyzing DRAM in the Memory Workload Analysis section.                                              
+

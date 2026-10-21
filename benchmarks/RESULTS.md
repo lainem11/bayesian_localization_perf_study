@@ -99,3 +99,25 @@ nsys stats --report cuda_gpu_kern_sum,cuda_api_sum,nvtx_sum,cuda_gpu_mem_time_su
     results/nsys_session.nsys-rep > results/nsys_stats_2026-10-21.txt
 ```
 We see that the total time for host-to-device and device-to-host transfers were 1.4 ms and 2.9 ms, respectively. Therefore, the device transfer overhead is insignificant.
+
+## Nsight Compute profiling for single kernel
+
+The largest single kernel is the `loop_add_log_fusion`, used by the `choose_next_stimulus()`. I profiled it using Nsight Compute with command:
+
+```
+ncu --kernel-name regex:loop_add_log_fusion --launch-skip 20 --launch-count 1 \
+    --section SpeedOfLight \
+    --metrics dram__bytes_read.sum,dram__bytes_write.sum,gpu__time_duration.sum \
+    python profile_de.py > results/ncu_loop_add_log_2026-10-21.txt
+```
+
+From the result file `ncu_loop_add_log_2026-10-21.txt`, we see a 77 MB read and 21 MB write. In `de_objective_traffic.txt` we estimated these numbers as 77 MB and 31 MB, respectively. The memory throughput is 93% and compute throughput 28%. Indeed, the DE is memory-bound.
+
+# Bottleneck table
+
+| Stage | Share of time | evidence | hypethesis | verdict
+|---|---:|---:|---:|---:|
+| `choose_next_stimulus()`| 36.7% | Total read/write close to theoretical limit, 90% of time is spent on objective evaluation, only 22 kernels launched with most of them small, largest kernel has 93% memory throughput and 28% compute throughput | Most of the time is spent on read and write, due to the large matrices involved | memory-bounded |
+| `record_efield_trial()`| 0% | - | - | - |
+| `simulate_response()` duration | 0% | - | - | - |
+| `localize()` duration | 63.3% | GPU busy-time of 7.5%, 85809 CUDA kernels launched, insignificant sync overhead| Most of time is spent launching CUDE kernels | launch-bounded |
