@@ -1,6 +1,6 @@
 GIT branch: perf-study
-GIT commit: bcc3cacfd98aeb1bdbc08385402f484b49f44ee6
-GIT dirty: True
+GIT commit: 7a0fb515d96869dca9d912ac9cacfdfd844f2fa4
+GIT dirty: False
 GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
 GPU memory:: 16 GB
 PyTorch version: 2.12.0+cu126
@@ -15,6 +15,6 @@ EvoSax version: 0.2.0
 NumPyro version: 0.20.1
 Python version: 3.13.16
 OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
-objective: median 2.481 ms, IQR 0.031 ms
+objective: median 2.481 ms, IQR 0.033 ms
 top-level kernels (fusion / custom-call): 22
-objective, back-to-back: 1.541 ms per call
+objective, back-to-back: 1.544 ms per call

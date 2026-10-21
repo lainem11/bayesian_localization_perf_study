@@ -59,7 +59,7 @@ The profiling slows down the execution somewhat, with 2.735/3 = 0.91 s duration 
 
 Running `profile_de.py` profiles a single run of the 200-step differential evolution optimization inside the `choose_next_stimulus()` method, after a 3-trial warm-up. I ran it with:
 ```
-python profile_de.py > results/profile_de_2026-10-20.txt
+python profile_de.py > results/profile_de_2026-10-21.txt
 ```
 The results show a median of 2.5 ms per optimization step when each step is synced. Without sync, an iteration averages just 1.5 ms. We can see the kernel stats from the XLA HLO dump, which can be formatted nicely with command:
 ```

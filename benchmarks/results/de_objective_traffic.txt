@@ -1,0 +1,26 @@
+kernel                          output shape                         read MB  write MB
+custom-call.1                   f32[22332,512] + s8[456880]              0.5      46.2
+gemm_fusion_dot_general.3       f32[7444,512,2]                         45.9      30.5
+triton_softmax.1                f32[7444,512,2]                         30.5      30.5
+loop_add_log_fusion             f32[7444,512] + f32[7444,512]           76.5      30.5
+input_reduce_fusion.5           f32[73,512]                             15.3       0.1
+input_reduce_fusion.9           f32[512]                                 0.1       0.0
+loop_select_fusion              f32[512]                                 0.0       0.0
+input_reduce_fusion.4           f32[73,512]                             15.3       0.1
+input_reduce_fusion.7           f32[512]                                 0.1       0.0
+loop_add_subtract_fusion        f32[512] + f32[512]                      0.0       0.0
+input_reduce_fusion.3           f32[73,512]                             15.2       0.1
+input_reduce_fusion.10          f32[512]                                 0.1       0.0
+loop_select_fusion.1            f32[512]                                 0.0       0.0
+input_reduce_fusion.2           f32[73,512]                             15.2       0.1
+input_reduce_fusion.6           f32[512]                                 0.1       0.0
+loop_add_fusion                 f32[512]                                 0.0       0.0
+wrapped_exponential             f32[7444]                                0.0       0.0
+input_reduce_fusion.1           f32[73,512]                             30.6       0.1
+input_reduce_fusion.8           f32[512]                                 0.1       0.0
+input_reduce_fusion             f32[73,512]                             45.7       0.1
+input_reduce_fusion.11          f32[512]                                 0.1       0.0
+loop_add_fusion.1               f32[512]                                 0.0       0.0
+TOTAL                                                                  291.6     138.6
+
+kernels: 22, total traffic: 430 MB
