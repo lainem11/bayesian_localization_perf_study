@@ -54,3 +54,6 @@ build/
 *.plotly
 .vscode/
 examples/saved/example_subject/example_session/figure_update.json
+
+## Benchmarking
+*.nsys-rep
