@@ -89,7 +89,8 @@ nsys stats --report nvtx_gpu_proj_sum,cuda_gpu_kern_sum \
 XLA runs the DE loop body as a CUDA graph with one lauch call. Therefore, we need the `--cuda-graph-trace=node` option to see inside it.
 
 From `nsys_stats_nodes_2026-10-21.txt`, we can see a few things:
-- 37220 calls are made to various kernels like `larft`, `orgqr`, `lacpy` and `batch_eye`. These belong to the QR decomposition that is done during the session setup. 372200 = 7444 vertices x 5 coils. The NVTX shows `gemm-fusion-autotuner` taking 659 ms, and during this time XLA tries different kernels during compilation to find the fastest.
+- Median time for `localize` is 935 ms, for `choose_next_stimulus` 331 ms and for `make_session()` 7.2 s. While `choose_next_stimulus` timing is close to what we measured earlier with per-function timing (339.6 ms) `localize` slowed down considerably from its recorded 586 ms time. This is likely due to the number of kernels launched, which we measured before at 85809 for `localize`. I also recorded the time for `make_session` outside nsys, with results in `2026-10-21_baseline_r1.json` revealing 4.2 s time. Delay here is likely for the same reason of kernel launching.
+- 37220 calls are made to various kernels like `larft`, `orgqr`, `lacpy` and `batch_eye`. These belong to the QR decomposition that is done during the session setup. 37220 = 7444 vertices x 5 coils (PCA dimensions). The NVTX shows `gemm-fusion-autotuner` taking 659 ms, and during this time XLA tries different kernels during compilation to find the fastest.
 
 `nsys_stats_2026-10-21.txt` shows the stats when the CUDA graph is not traced, and transfertimes between host and device. I produced the report with:
 
@@ -97,4 +98,4 @@ From `nsys_stats_nodes_2026-10-21.txt`, we can see a few things:
 nsys stats --report cuda_gpu_kern_sum,cuda_api_sum,nvtx_sum,cuda_gpu_mem_time_sum \
     results/nsys_session.nsys-rep > results/nsys_stats_2026-10-21.txt
 ```
-We see that the total time for host-to-device and device-to-host transfers were 2.9 ms and 1.4 ms, respectively. Therefore, the device transfer overhead is insignificant.
+We see that the total time for host-to-device and device-to-host transfers were 1.4 ms and 2.9 ms, respectively. Therefore, the device transfer overhead is insignificant.

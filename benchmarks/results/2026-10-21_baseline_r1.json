@@ -1,0 +1,102 @@
+{
+  "env": {
+    "GIT branch": "perf-study",
+    "GIT commit": "438b209b053adf30401b6f7b2247fb08adf2f111",
+    "GIT dirty": true,
+    "GPU model and driver version": "NVIDIA GeForce RTX 4060 Ti |  610.88",
+    "GPU memory:": "16 GB",
+    "PyTorch version": "2.12.0+cu126",
+    "CUDA version for PyTorch": "12.6",
+    "Is CUDA available": true,
+    "JAX version": "0.7.2",
+    "jaxlib version": "0.7.2",
+    "JAX CUDA libs version": "0.7.2",
+    "JAX devices": [
+      "cuda:0"
+    ],
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "false",
+    "EvoSax version": "0.2.0",
+    "NumPyro version": "0.20.1",
+    "Python version": "3.13.16",
+    "OS:": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43"
+  },
+  "args": {
+    "trials": 3,
+    "warmup": 1,
+    "repeats": 1,
+    "out": "results/2026-10-21_baseline_r1.json"
+  },
+  "runs": [
+    {
+      "make_session() duration": [
+        4.235853399000916
+      ],
+      "trial number": [
+        0,
+        1,
+        2
+      ],
+      "didt": [
+        [
+          -43620440.0,
+          -15179044.0,
+          4946360.5,
+          29084904.0,
+          16980582.0
+        ],
+        [
+          73302504.0,
+          22334286.0,
+          10721241.0,
+          83301792.0,
+          -19881546.0
+        ],
+        [
+          -10514268.0,
+          89174720.0,
+          -17807900.0,
+          15008698.0,
+          -30130466.0
+        ]
+      ],
+      "choose_next_stimulus() duration": [
+        4.24881344700043,
+        0.36601196999981767,
+        0.32991042499998
+      ],
+      "record_efield_trial() duration": [
+        0.000691561999701662,
+        0.0004295550024835393,
+        0.00022142799934954382
+      ],
+      "simulate_response() duration": [
+        0.12364166800034582,
+        0.0015337850018113386,
+        0.0010400840001238976
+      ],
+      "localize() duration": [
+        2.107140647000051,
+        0.5769582800021453,
+        0.5760791360007715
+      ],
+      "max prob. index": [
+        6593,
+        2822,
+        5265
+      ],
+      "adam steps": [
+        150,
+        150,
+        150
+      ],
+      "total session duration": [
+        8.352043547998619
+      ],
+      "responses": [
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ]
+}
