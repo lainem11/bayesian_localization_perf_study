@@ -44,7 +44,8 @@ if __name__ == "__main__":
         results = defaultdict(list)
 
         # Initialize a LocalizationSession
-        S = make_session()
+        S, name, dur = timed("make_session() duration", make_session)
+        results[name].append(dur)
 
         # Run warmup
         ses_t0 = time.perf_counter()
