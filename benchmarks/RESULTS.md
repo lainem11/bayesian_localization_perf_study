@@ -51,4 +51,6 @@ Running the script `profile_localize.py` run PyTorch Profiler to calculate CPU a
 python profile_localize.py > results/profile_localize_2026-10-20.txt
 ```
 
+code = 4fed753 + the script as committed in 7fb35e9 / 63622a0
+
 The profiling slows down the execution somewhat, with 2.735/3 = 0.91 s duration per call compared to 0.59 recorded at the baseline. Most of the time goes on the CPU: Python code and launch overhead. The whole-run GPU busy fraction was 205 ms / 2.735 s = 7.5%. A total of 85809 CUDA kernels were launched, with about 1006 ms / 85809 = 12 us of CPU time and 205 ms / 85809 = 2.4 us of GPU time per kernel. Therefore, CPU dominates the per-kernel times. One Adam step launches around 190 kernels. The Adam step uses on average 1.271 ms of CPU time versus 140 us of GPU time. So GPU is busy roughly 10% of the time. The computation is launch-bound and the fix is to send fewer launches and less Python per step. We also see that cudaStreamSynchronize has a total CPU time of 10.7 ms. This around 0.4% of the wall time, so the sync is not a bottleneck to the performance here.
