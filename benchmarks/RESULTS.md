@@ -54,3 +54,11 @@ python profile_localize.py > results/profile_localize_2026-10-20.txt
 code = 4fed753 + the script as committed in 7fb35e9 / 63622a0
 
 The profiling slows down the execution somewhat, with 2.735/3 = 0.91 s duration per call compared to 0.59 recorded at the baseline. Most of the time goes on the CPU: Python code and launch overhead. The whole-run GPU busy fraction was 205 ms / 2.735 s = 7.5%. A total of 85809 CUDA kernels were launched, with about 1006 ms / 85809 = 12 us of CPU time and 205 ms / 85809 = 2.4 us of GPU time per kernel. Therefore, CPU dominates the per-kernel times. One Adam step launches around 190 kernels. The Adam step uses on average 1.271 ms of CPU time versus 140 us of GPU time. So GPU is busy roughly 10% of the time. The computation is launch-bound and the fix is to send fewer launches and less Python per step. We also see that cudaStreamSynchronize has a total CPU time of 10.7 ms. This around 0.4% of the wall time, so the sync is not a bottleneck to the performance here.
+
+## choose_next_stimulus()
+
+Running `profile_de.py` profiles a single run of the 200-step differential evolution optimization inside the `choose_next_stimulus()` method, after a 3-trial warm-up. I ran it with:
+```
+python profile_de.py > results/profile_de_2026-10-20.txt
+```
+The results show a median of 2.5 ms per optimization step when each step is synced. Without sync, an iteration averages just 1.5 ms. The number of kernels launched was 22. The biggest fused matrices have shape [22332,512], where 22332 = 7444 * 3, the E-field matrix flattened, and 512 is the population size. That has the size of (22332 * 512) * 4 / 1024 / 1024 = 44 MB. That is more than the GPU L2 cache of 32 MB. There was roughly four kernels with similar size. Some with shape [7444,512,2] are used in the response function, and they are the electric fields with one dimension dropped. These count to 29 MB, and may demonstrate a way to reduce the memory load.
