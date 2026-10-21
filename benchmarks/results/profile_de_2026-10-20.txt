@@ -1,2 +1,20 @@
-objective: median 2.487 ms, IQR 0.031 ms
+GIT branch: perf-study
+GIT commit: bcc3cacfd98aeb1bdbc08385402f484b49f44ee6
+GIT dirty: True
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+objective: median 2.481 ms, IQR 0.031 ms
 top-level kernels (fusion / custom-call): 22
+objective, back-to-back: 1.541 ms per call
