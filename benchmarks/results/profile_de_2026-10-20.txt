@@ -1,0 +1,2 @@
+objective: median 2.487 ms, IQR 0.031 ms
+top-level kernels (fusion / custom-call): 22

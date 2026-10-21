@@ -1,0 +1,426 @@
+HloModule jit_single_objective_fun, is_scheduled=true, entry_computation_layout={(f32[512,5]{1,0}, f32[7444]{0}, f32[7444]{0}, f32[7444]{0}, f32[7444]{0}, /*index=5*/f32[7444]{0}, f32[7444]{0}, f32[7444]{0})->f32[512]{0}}, allow_spmd_sharding_propagation_to_parameters={true,true,true,true,true,true,true,true}, allow_spmd_sharding_propagation_to_output={true}, frontend_attributes={fingerprint_before_lhs="c23625e8184eac19b026d483e3cbbd57"}
+
+%gemm_fusion_dot_general.3_computation (parameter_0.1: f32[7444,3,512], parameter_1.1: f32[7444,3,2]) -> f32[7444,512,2] {
+  %parameter_0.1 = f32[7444,3,512]{2,1,0} parameter(0)
+  %parameter_1.1 = f32[7444,3,2]{2,1,0} parameter(1)
+  ROOT %dot_general.0 = f32[7444,512,2]{2,1,0} dot(%parameter_0.1, %parameter_1.1), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={0}, rhs_contracting_dims={1}, metadata={op_name="jit(single_objective_fun)/vmap(vd,vdt->vt)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=83 source_end_line=83 source_column=15 source_end_column=65}
+}
+
+%region_0.1.clone.4 (reduce_sum.30: f32[], reduce_sum.31: f32[]) -> f32[] {
+  %reduce_sum.30 = f32[] parameter(0), metadata={op_name="reduce_sum"}
+  %reduce_sum.31 = f32[] parameter(1), metadata={op_name="reduce_sum"}
+  ROOT %reduce_sum.32.0 = f32[] add(%reduce_sum.30, %reduce_sum.31), metadata={op_name="reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+}
+
+%triton_softmax_computation.1 (parameter_0.3: f32[7444,512,2]) -> f32[7444,512,2] {
+  %parameter_0.3 = f32[7444,512,2]{2,1,0} parameter(0)
+  %mul.7 = f32[7444,512,2]{2,1,0} multiply(%parameter_0.3, %parameter_0.3), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=45 source_end_column=99}
+  %constant_23 = f32[] constant(0)
+  %reduce_sum.40 = f32[7444,512]{1,0} reduce(%mul.7, %constant_23), dimensions={2}, to_apply=%region_0.1.clone.4, metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=45 source_end_column=99}
+  %bitcast.183 = f32[1,7444,512]{2,1,0} bitcast(%reduce_sum.40)
+  %sqrt.11 = f32[1,7444,512]{2,1,0} sqrt(%bitcast.183), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=45 source_end_column=99}
+  %bitcast.184 = f32[7444,512]{1,0} bitcast(%sqrt.11)
+  %broadcast.58 = f32[7444,512,2]{2,1,0} broadcast(%bitcast.184), dimensions={0,1}, metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=29 source_end_column=99}
+  ROOT %divide.3 = f32[7444,512,2]{2,1,0} divide(%parameter_0.3, %broadcast.58), metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=29 source_end_column=99}
+}
+
+%region_2.8.clone.1 (reduce_max.6: f32[], reduce_max.7: f32[]) -> f32[] {
+  %reduce_max.6 = f32[] parameter(0), metadata={op_name="reduce_max"}
+  %reduce_max.7 = f32[] parameter(1), metadata={op_name="reduce_max"}
+  ROOT %reduce_max.8.0 = f32[] maximum(%reduce_max.6, %reduce_max.7), metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%region_0.1.clone.3 (reduce_sum.24: f32[], reduce_sum.25: f32[]) -> f32[] {
+  %reduce_sum.24 = f32[] parameter(0), metadata={op_name="reduce_sum"}
+  %reduce_sum.25 = f32[] parameter(1), metadata={op_name="reduce_sum"}
+  ROOT %reduce_sum.29.0 = f32[] add(%reduce_sum.24, %reduce_sum.25), metadata={op_name="reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+}
+
+%fused_reduce (param_0.230: f32[22332,512]) -> f32[73,512] {
+  %param_0.230 = f32[22332,512]{1,0} parameter(0)
+  %bitcast.191.9 = f32[7444,3,512]{2,1,0} bitcast(%param_0.230), metadata={op_name="jit(single_objective_fun)/vmap(cvd,c->vd)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=134 source_end_line=134 source_column=18 source_end_column=72}
+  %mul.1.9 = f32[7444,3,512]{2,1,0} multiply(%bitcast.191.9, %bitcast.191.9), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %constant_41_5 = f32[] constant(0)
+  %reduce_sum.8.7 = f32[7444,512]{1,0} reduce(%mul.1.9, %constant_41_5), dimensions={1}, to_apply=%region_0.1.clone.3, metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %sqrt.2.5 = f32[7444,512]{1,0} sqrt(%reduce_sum.8.7), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %constant_47_6 = f32[] constant(-inf)
+  %pad.5.1 = f32[7446,512]{1,0} pad(%sqrt.2.5, %constant_47_6), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %bitcast.190.1 = f32[73,102,512]{2,1,0} bitcast(%pad.5.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  ROOT %reduce.15.1 = f32[73,512]{1,0} reduce(%bitcast.190.1, %constant_47_6), dimensions={1}, to_apply=%region_2.8.clone.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=153 source_end_line=153 source_column=21 source_end_column=63}
+}
+
+%region_0.1.clone.2 (reduce_sum.18: f32[], reduce_sum.22: f32[]) -> f32[] {
+  %reduce_sum.18 = f32[] parameter(0), metadata={op_name="reduce_sum"}
+  %reduce_sum.22 = f32[] parameter(1), metadata={op_name="reduce_sum"}
+  ROOT %reduce_sum.23.0 = f32[] add(%reduce_sum.18, %reduce_sum.22), metadata={op_name="reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+}
+
+%fused_reduce.1 (param_0.224: f32[7444], param_1.255: f32[512], param_2.144: f32[7444,512], param_3.89: f32[512], param_4.71: f32[512], param_5.72: f32[7444,512], param_6.71: f32[7444]) -> f32[73,512] {
+  %param_4.71 = f32[512]{0} parameter(4)
+  %broadcast.43.1 = f32[7444,512]{1,0} broadcast(%param_4.71), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=27 source_end_column=84}
+  %param_0.224 = f32[7444]{0} parameter(0)
+  %broadcast.44.16 = f32[7444,512]{1,0} broadcast(%param_0.224), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=51 source_end_column=83}
+  %param_2.144 = f32[7444,512]{1,0} parameter(2)
+  %param_3.89 = f32[512]{0} parameter(3)
+  %broadcast.46.1 = f32[7444,512]{1,0} broadcast(%param_3.89), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=125 source_end_line=125 source_column=27 source_end_column=51}
+  %subtract.3.1 = f32[7444,512]{1,0} subtract(%param_2.144, %broadcast.46.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=125 source_end_line=125 source_column=27 source_end_column=51}
+  %exponential.3.1 = f32[7444,512]{1,0} exponential(%subtract.3.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=65 source_end_column=83}
+  %subtract.4.7 = f32[7444,512]{1,0} subtract(%broadcast.44.16, %exponential.3.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=51 source_end_column=83}
+  %abs.12 = f32[7444,512]{1,0} abs(%subtract.4.7), metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=43 source_end_column=84}
+  %multiply.7.3 = f32[7444,512]{1,0} multiply(%broadcast.43.1, %abs.12), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=27 source_end_column=84}
+  %param_1.255 = f32[512]{0} parameter(1)
+  %exp.10.2 = f32[512]{0} exponential(%param_1.255), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=137 source_end_line=137 source_column=18 source_end_column=38}
+  %broadcast.47.1 = f32[7444,512]{1,0} broadcast(%exp.10.2), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=27 source_end_column=78}
+  %param_6.71 = f32[7444]{0} parameter(6)
+  %broadcast.26.6 = f32[7444,512]{1,0} broadcast(%param_6.71), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %param_5.72 = f32[7444,512]{1,0} parameter(5)
+  %add.14.5 = f32[7444,512]{1,0} add(%broadcast.26.6, %param_5.72), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %broadcast.48.1 = f32[7444,512]{1,0} broadcast(%param_1.255), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=119 source_end_line=119 source_column=27 source_end_column=51}
+  %subtract.5.1 = f32[7444,512]{1,0} subtract(%add.14.5, %broadcast.48.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=119 source_end_line=119 source_column=27 source_end_column=51}
+  %exponential.4.1 = f32[7444,512]{1,0} exponential(%subtract.5.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=59 source_end_column=77}
+  %subtract.6.9 = f32[7444,512]{1,0} subtract(%broadcast.44.16, %exponential.4.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=45 source_end_column=77}
+  %abs.1.7 = f32[7444,512]{1,0} abs(%subtract.6.9), metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=37 source_end_column=78}
+  %multiply.8.5 = f32[7444,512]{1,0} multiply(%broadcast.47.1, %abs.1.7), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=27 source_end_column=78}
+  %add.16.3 = f32[7444,512]{1,0} add(%multiply.7.3, %multiply.8.5), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=27 source_end_column=84}
+  %constant_41_9 = f32[] constant(0)
+  %pad.4.1 = f32[7446,512]{1,0} pad(%add.16.3, %constant_41_9), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=27 source_end_column=84}
+  %bitcast.189.1 = f32[73,102,512]{2,1,0} bitcast(%pad.4.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=27 source_end_column=84}
+  ROOT %reduce.13.1 = f32[73,512]{1,0} reduce(%bitcast.189.1, %constant_41_9), dimensions={1}, to_apply=%region_0.1.clone.2, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+}
+
+%region_0.1.clone.1 (reduce_sum.14: f32[], reduce_sum.16: f32[]) -> f32[] {
+  %reduce_sum.14 = f32[] parameter(0), metadata={op_name="reduce_sum"}
+  %reduce_sum.16 = f32[] parameter(1), metadata={op_name="reduce_sum"}
+  ROOT %reduce_sum.17.0 = f32[] add(%reduce_sum.14, %reduce_sum.16), metadata={op_name="reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+}
+
+%fused_reduce.2 (param_0.222: f32[7444,512], param_1.253: f32[512]) -> f32[73,512] {
+  %param_0.222 = f32[7444,512]{1,0} parameter(0)
+  %param_1.253 = f32[512]{0} parameter(1)
+  %broadcast.45.1 = f32[7444,512]{1,0} broadcast(%param_1.253), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %subtract.2.1 = f32[7444,512]{1,0} subtract(%param_0.222, %broadcast.45.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %exponential.2.1 = f32[7444,512]{1,0} exponential(%subtract.2.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %constant_41_7 = f32[] constant(0)
+  %pad.3.1 = f32[7446,512]{1,0} pad(%exponential.2.1, %constant_41_7), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %bitcast.188.1 = f32[73,102,512]{2,1,0} bitcast(%pad.3.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  ROOT %reduce.11.1 = f32[73,512]{1,0} reduce(%bitcast.188.1, %constant_41_7), dimensions={1}, to_apply=%region_0.1.clone.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%region_2.8.clone (reduce_max.0: f32[], reduce_max.1: f32[]) -> f32[] {
+  %reduce_max.0 = f32[] parameter(0), metadata={op_name="reduce_max"}
+  %reduce_max.1 = f32[] parameter(1), metadata={op_name="reduce_max"}
+  ROOT %reduce_max.2.0 = f32[] maximum(%reduce_max.0, %reduce_max.1), metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_reduce.3 (param_0.228: f32[7444,512]) -> f32[73,512] {
+  %param_0.228 = f32[7444,512]{1,0} parameter(0)
+  %constant_47_4 = f32[] constant(-inf)
+  %pad.2.1 = f32[7446,512]{1,0} pad(%param_0.228, %constant_47_4), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  %bitcast.187.1 = f32[73,102,512]{2,1,0} bitcast(%pad.2.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  ROOT %reduce.9.1 = f32[73,512]{1,0} reduce(%bitcast.187.1, %constant_47_4), dimensions={1}, to_apply=%region_2.8.clone, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%region_0.1 (reduce_sum.3: f32[], reduce_sum.4: f32[]) -> f32[] {
+  %reduce_sum.3 = f32[] parameter(0), metadata={op_name="reduce_sum"}
+  %reduce_sum.4 = f32[] parameter(1), metadata={op_name="reduce_sum"}
+  ROOT %reduce_sum.5.0 = f32[] add(%reduce_sum.3, %reduce_sum.4), metadata={op_name="reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+}
+
+%fused_reduce.4 (param_0.223: f32[512], param_1.254: f32[7444,512], param_2.143: f32[7444]) -> f32[73,512] {
+  %param_2.143 = f32[7444]{0} parameter(2)
+  %broadcast.26.4 = f32[7444,512]{1,0} broadcast(%param_2.143), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %param_1.254 = f32[7444,512]{1,0} parameter(1)
+  %add.14.3 = f32[7444,512]{1,0} add(%broadcast.26.4, %param_1.254), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %param_0.223 = f32[512]{0} parameter(0)
+  %broadcast.42.1 = f32[7444,512]{1,0} broadcast(%param_0.223), dimensions={1}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %subtract.1.1 = f32[7444,512]{1,0} subtract(%add.14.3, %broadcast.42.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %exponential.1.1 = f32[7444,512]{1,0} exponential(%subtract.1.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %constant_41_8 = f32[] constant(0)
+  %pad.1.1 = f32[7446,512]{1,0} pad(%exponential.1.1, %constant_41_8), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %bitcast.186.1 = f32[73,102,512]{2,1,0} bitcast(%pad.1.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  ROOT %reduce.7.1 = f32[73,512]{1,0} reduce(%bitcast.186.1, %constant_41_8), dimensions={1}, to_apply=%region_0.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%region_2.8 (reduce_max.3: f32[], reduce_max.4: f32[]) -> f32[] {
+  %reduce_max.3 = f32[] parameter(0), metadata={op_name="reduce_max"}
+  %reduce_max.4 = f32[] parameter(1), metadata={op_name="reduce_max"}
+  ROOT %reduce_max.5.0 = f32[] maximum(%reduce_max.3, %reduce_max.4), metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_reduce.5 (param_0.229: f32[7444,512], param_1.259: f32[7444]) -> f32[73,512] {
+  %param_1.259 = f32[7444]{0} parameter(1)
+  %broadcast.26.8 = f32[7444,512]{1,0} broadcast(%param_1.259), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %param_0.229 = f32[7444,512]{1,0} parameter(0)
+  %add.14.7 = f32[7444,512]{1,0} add(%broadcast.26.8, %param_0.229), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %constant_47_5 = f32[] constant(-inf)
+  %pad.7 = f32[7446,512]{1,0} pad(%add.14.7, %constant_47_5), padding=0_2x0_0, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %bitcast.185.1 = f32[73,102,512]{2,1,0} bitcast(%pad.7), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  ROOT %reduce.5.1 = f32[73,512]{1,0} reduce(%bitcast.185.1, %constant_47_5), dimensions={1}, to_apply=%region_2.8, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_add_log (param_0.105: f32[7444], param_1.268: f32[7444], param_2.152: f32[7444], param_3.103: f32[7444], param_4.82: f32[7444], param_5.88: f32[7444,512,2], param_6.88: f32[7444], param_7.78: f32[7444], param_8.73: f32[7444], param_9.70: f32[22332,512]) -> (f32[7444,512], f32[7444,512]) {
+  %param_0.105 = f32[7444]{0} parameter(0)
+  %broadcast.26.2 = f32[7444,512]{1,0} broadcast(%param_0.105), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=117 source_end_line=117 source_column=21 source_end_column=59}
+  %constant_53_1_clone_1 = f32[] constant(1e-06)
+  %broadcast.27.1.clone.1 = f32[7444,512]{1,0} broadcast(%constant_53_1_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=104 source_end_line=104 source_column=15 source_end_column=72}
+  %param_9.70 = f32[22332,512]{1,0} parameter(9)
+  %bitcast.191.7.clone.1 = f32[7444,3,512]{2,1,0} bitcast(%param_9.70), metadata={op_name="jit(single_objective_fun)/vmap(cvd,c->vd)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=134 source_end_line=134 source_column=18 source_end_column=72}
+  %mul.1.7.clone.1 = f32[7444,3,512]{2,1,0} multiply(%bitcast.191.7.clone.1, %bitcast.191.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %constant_41_6_clone_1 = f32[] constant(0)
+  %reduce_sum.8.5.clone.1 = f32[7444,512]{1,0} reduce(%mul.1.7.clone.1, %constant_41_6_clone_1), dimensions={1}, to_apply=%region_0.1.clone.3, metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %sqrt.2.3.clone.1 = f32[7444,512]{1,0} sqrt(%reduce_sum.8.5.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(norm))/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=87 source_end_line=87 source_column=16 source_end_column=48}
+  %constant_15_1_clone_1 = f32[] constant(-16), metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/convert_element_type" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=21 source_end_column=95}
+  %broadcast.28.1.clone.1 = f32[7444,512]{1,0} broadcast(%constant_15_1_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=21 source_end_column=95}
+  %param_8.73 = f32[7444]{0} parameter(8)
+  %neg.3.1.clone.1 = f32[7444]{0} negate(%param_8.73), metadata={op_name="jit(single_objective_fun)/vmap()/neg" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=30 source_end_column=49}
+  %broadcast.29.1.clone.1 = f32[7444,512]{1,0} broadcast(%neg.3.1.clone.1), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=30 source_end_column=49}
+  %param_7.78 = f32[7444]{0} parameter(7)
+  %broadcast.30.1.clone.1 = f32[7444,512]{1,0} broadcast(%param_7.78), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=96 source_end_line=97 source_column=12 source_end_column=51}
+  %param_6.88 = f32[7444]{0} parameter(6)
+  %broadcast.31.1.clone.1 = f32[7444,512]{1,0} broadcast(%param_6.88), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=97 source_end_line=97 source_column=12 source_end_column=51}
+  %param_5.88 = f32[7444,512,2]{2,1,0} parameter(5)
+  %slice.1.3.clone.1 = f32[7444,512,1]{2,1,0} slice(%param_5.88), slice={[0:7444], [0:512], [1:2]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=77 source_end_line=77 source_column=31 source_end_column=41}
+  %bitcast.32.7.clone.1 = f32[7444,512]{1,0} bitcast(%slice.1.3.clone.1)
+  %slice.2.3.clone.1 = f32[7444,512,1]{2,1,0} slice(%param_5.88), slice={[0:7444], [0:512], [0:1]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=77 source_end_line=77 source_column=43 source_end_column=53}
+  %bitcast.37.7.clone.1 = f32[7444,512]{1,0} bitcast(%slice.2.3.clone.1)
+  %atan2.10.clone.1 = f32[7444,512]{1,0} atan2(%bitcast.32.7.clone.1, %bitcast.37.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/atan2" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=77 source_end_line=77 source_column=19 source_end_column=54}
+  %param_4.82 = f32[7444]{0} parameter(4)
+  %broadcast.33.3.clone.1 = f32[7444,512]{1,0} broadcast(%param_4.82), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=78 source_end_line=78 source_column=21 source_end_column=40}
+  %add.7.5.clone.1 = f32[7444,512]{1,0} add(%atan2.10.clone.1, %broadcast.33.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=78 source_end_line=78 source_column=21 source_end_column=40}
+  %constant_50_1_clone_1 = f32[] constant(6.28318548)
+  %broadcast.34.10.clone.1 = f32[7444,512]{1,0} broadcast(%constant_50_1_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/rem" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %remainder.4.clone.1 = f32[7444,512]{1,0} remainder(%add.7.5.clone.1, %broadcast.34.10.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/rem" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %broadcast.35.6.clone.1 = f32[7444,512]{1,0} broadcast(%constant_41_6_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))"}
+  %compare.5.clone.1 = pred[7444,512]{1,0} compare(%remainder.4.clone.1, %broadcast.35.6.clone.1), direction=LT, metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/lt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %compare.1.3.clone.1 = pred[7444,512]{1,0} compare(%remainder.4.clone.1, %broadcast.35.6.clone.1), direction=NE, metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/ne" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %and.2.1.clone.1 = pred[7444,512]{1,0} and(%compare.5.clone.1, %compare.1.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/and" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %add.8.7.clone.1 = f32[7444,512]{1,0} add(%remainder.4.clone.1, %broadcast.34.10.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %select.8.clone.1 = f32[7444,512]{1,0} select(%and.2.1.clone.1, %add.8.7.clone.1, %remainder.4.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(remainder))/select_n" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=79 source_end_line=79 source_column=15 source_end_column=40}
+  %cosine.25.clone.1 = f32[7444,512]{1,0} cosine(%select.8.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/cos" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=97 source_end_line=97 source_column=36 source_end_column=51}
+  %multiply.1.23.clone.1 = f32[7444,512]{1,0} multiply(%broadcast.31.1.clone.1, %cosine.25.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=97 source_end_line=97 source_column=12 source_end_column=51}
+  %add.9.21.clone.1 = f32[7444,512]{1,0} add(%broadcast.30.1.clone.1, %multiply.1.23.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=96 source_end_line=97 source_column=12 source_end_column=51}
+  %param_3.103 = f32[7444]{0} parameter(3)
+  %broadcast.36.1.clone.1 = f32[7444,512]{1,0} broadcast(%param_3.103), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=98 source_end_line=98 source_column=12 source_end_column=51}
+  %sine.23.clone.1 = f32[7444,512]{1,0} sine(%select.8.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/sin" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=98 source_end_line=98 source_column=36 source_end_column=51}
+  %multiply.2.21.clone.1 = f32[7444,512]{1,0} multiply(%broadcast.36.1.clone.1, %sine.23.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=98 source_end_line=98 source_column=12 source_end_column=51}
+  %add.10.19.clone.1 = f32[7444,512]{1,0} add(%add.9.21.clone.1, %multiply.2.21.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=96 source_end_line=97 source_column=12 source_end_column=51}
+  %param_2.152 = f32[7444]{0} parameter(2)
+  %broadcast.37.3.clone.1 = f32[7444,512]{1,0} broadcast(%param_2.152), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=99 source_end_line=99 source_column=12 source_end_column=55}
+  %constant_43_1_clone_1 = f32[] constant(2)
+  %broadcast.38.3.clone.1 = f32[7444,512]{1,0} broadcast(%constant_43_1_clone_1), dimensions={}
+  %multiply.3.5.clone.1 = f32[7444,512]{1,0} multiply(%select.8.clone.1, %broadcast.38.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=99 source_end_line=99 source_column=44 source_end_column=54}
+  %cosine.1.7.clone.1 = f32[7444,512]{1,0} cosine(%multiply.3.5.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/cos" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=99 source_end_line=99 source_column=36 source_end_column=55}
+  %multiply.4.7.clone.1 = f32[7444,512]{1,0} multiply(%broadcast.37.3.clone.1, %cosine.1.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=99 source_end_line=99 source_column=12 source_end_column=55}
+  %add.11.17.clone.1 = f32[7444,512]{1,0} add(%add.10.19.clone.1, %multiply.4.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=96 source_end_line=97 source_column=12 source_end_column=51}
+  %param_1.268 = f32[7444]{0} parameter(1)
+  %broadcast.39.3.clone.1 = f32[7444,512]{1,0} broadcast(%param_1.268), dimensions={0}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=100 source_end_line=100 source_column=12 source_end_column=55}
+  %sine.1.7.clone.1 = f32[7444,512]{1,0} sine(%multiply.3.5.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/sin" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=100 source_end_line=100 source_column=36 source_end_column=55}
+  %multiply.5.7.clone.1 = f32[7444,512]{1,0} multiply(%broadcast.39.3.clone.1, %sine.1.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=100 source_end_line=100 source_column=12 source_end_column=55}
+  %add.12.15.clone.1 = f32[7444,512]{1,0} add(%add.11.17.clone.1, %multiply.5.7.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=96 source_end_line=97 source_column=12 source_end_column=51}
+  %subtract.20.clone.1 = f32[7444,512]{1,0} subtract(%sqrt.2.3.clone.1, %add.12.15.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=53 source_end_column=84}
+  %multiply.6.11.clone.1 = f32[7444,512]{1,0} multiply(%broadcast.29.1.clone.1, %subtract.20.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=30 source_end_column=49}
+  %constant_14_1_clone_1 = f32[] constant(16), metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/convert_element_type" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=21 source_end_column=95}
+  %broadcast.40.3.clone.1 = f32[7444,512]{1,0} broadcast(%constant_14_1_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/min" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=21 source_end_column=95}
+  %clamp.3.9.clone.1 = f32[7444,512]{1,0} clamp(%broadcast.28.1.clone.1, %multiply.6.11.clone.1, %broadcast.40.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/min" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=102 source_end_line=102 source_column=21 source_end_column=95}
+  %exponential.12.clone.1 = f32[7444,512]{1,0} exponential(%clamp.3.9.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=103 source_end_line=103 source_column=41 source_end_column=60}
+  %add.13.5.clone.1 = f32[7444,512]{1,0} add(%sqrt.2.3.clone.1, %exponential.12.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=103 source_end_line=103 source_column=33 source_end_column=60}
+  %divide.1.5.clone.1 = f32[7444,512]{1,0} divide(%sqrt.2.3.clone.1, %add.13.5.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=103 source_end_line=103 source_column=24 source_end_column=61}
+  %constant_54_1_clone_1 = f32[] constant(0.999999)
+  %broadcast.41.3.clone.1 = f32[7444,512]{1,0} broadcast(%constant_54_1_clone_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/min" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=104 source_end_line=104 source_column=15 source_end_column=72}
+  %clamp.4.3.clone.1 = f32[7444,512]{1,0} clamp(%broadcast.27.1.clone.1, %divide.1.5.clone.1, %broadcast.41.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap(jit(clip))/min" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=104 source_end_line=104 source_column=15 source_end_column=72}
+  %log.3.clone.1 = f32[7444,512]{1,0} log(%clamp.4.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/log" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=108 source_end_line=108 source_column=15 source_end_column=74}
+  %exponential-minus-one.4 = f32[7444,512]{1,0} exponential-minus-one(%log.3.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/expm1" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=122 source_end_line=122 source_column=46 source_end_column=73}
+  %negate.3.3 = f32[7444,512]{1,0} negate(%exponential-minus-one.4), metadata={op_name="jit(single_objective_fun)/vmap()/neg" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=122 source_end_line=122 source_column=45 source_end_column=73}
+  %log.1.1 = f32[7444,512]{1,0} log(%negate.3.3), metadata={op_name="jit(single_objective_fun)/vmap()/log" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=122 source_end_line=122 source_column=37 source_end_column=74}
+  %add.15.1 = f32[7444,512]{1,0} add(%broadcast.26.2, %log.1.1), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  ROOT %tuple.1 = (f32[7444,512]{1,0}, f32[7444,512]{1,0}) tuple(%add.15.1, %log.3.clone.1)
+}
+
+%fused_add (param_0.134: f32[512], param_1.163: f32[512]) -> f32[512] {
+  %param_1.163 = f32[512]{0} parameter(1)
+  %log.7.1 = f32[512]{0} log(%param_1.163), metadata={op_name="jit(single_objective_fun)/vmap()/log" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %param_0.134 = f32[512]{0} parameter(0)
+  ROOT %add.48.1 = f32[512]{0} add(%log.7.1, %param_0.134), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%fused_select (param_0.217: f32[512]) -> f32[512] {
+  %param_0.217 = f32[512]{0} parameter(0)
+  %is_finite.2.1 = pred[512]{0} is-finite(%param_0.217), metadata={op_name="jit(single_objective_fun)/vmap()/is_finite" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %constant_41_10 = f32[] constant(0)
+  %broadcast.11.1 = f32[512]{0} broadcast(%constant_41_10), dimensions={}
+  ROOT %select_n.4.1 = f32[512]{0} select(%is_finite.2.1, %param_0.217, %broadcast.11.1), metadata={op_name="jit(single_objective_fun)/vmap()/select_n" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_select.1 (param_0.216: f32[512]) -> f32[512] {
+  %param_0.216 = f32[512]{0} parameter(0)
+  %is_finite.3.1 = pred[512]{0} is-finite(%param_0.216), metadata={op_name="jit(single_objective_fun)/vmap()/is_finite" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %constant_41_11 = f32[] constant(0)
+  %broadcast.11.2 = f32[512]{0} broadcast(%constant_41_11), dimensions={}
+  ROOT %select_n.5.1 = f32[512]{0} select(%is_finite.3.1, %param_0.216, %broadcast.11.2), metadata={op_name="jit(single_objective_fun)/vmap()/select_n" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%fused_add.1 (param_0.219: f32[512], param_1.263: f32[512,5], param_2.148: f32[512]) -> f32[512] {
+  %param_0.219 = f32[512]{0} parameter(0)
+  %constant_10_1 = f32[] constant(0.000134336384)
+  %broadcast.1.3 = f32[512]{0} broadcast(%constant_10_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+  %multiply.12 = f32[512]{0} multiply(%param_0.219, %broadcast.1.3), metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+  %neg.5.3 = f32[512]{0} negate(%multiply.12), metadata={op_name="jit(single_objective_fun)/vmap()/neg" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=143 source_end_line=143 source_column=20 source_end_column=36}
+  %param_1.263 = f32[512,5]{1,0} parameter(1)
+  %abs.9.31 = f32[512,5]{1,0} abs(%param_1.263), metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=21 source_end_line=21 source_column=22 source_end_column=38}
+  %slice.14.3 = f32[512,1]{1,0} slice(%abs.9.31), slice={[0:512], [0:1]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=33 source_end_column=47}
+  %bitcast.5.8 = f32[512]{0} bitcast(%slice.14.3), metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=33 source_end_column=47}
+  %integer_pow.8.7 = f32[512]{0} multiply(%bitcast.5.8, %bitcast.5.8), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=33 source_end_column=47}
+  %constant_38_1 = f32[] constant(0.9)
+  %broadcast.10.18 = f32[512]{0} broadcast(%constant_38_1), dimensions={}
+  %mul.81.7 = f32[512]{0} multiply(%integer_pow.8.7, %broadcast.10.18), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=27 source_end_column=50}
+  %slice.15.9 = f32[512,1]{1,0} slice(%abs.9.31), slice={[0:512], [1:2]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=53 source_end_column=67}
+  %bitcast.6.6 = f32[512]{0} bitcast(%slice.15.9), metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=53 source_end_column=67}
+  %integer_pow.9.3 = f32[512]{0} multiply(%bitcast.6.6, %bitcast.6.6), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=53 source_end_column=67}
+  %add.50.5 = f32[512]{0} add(%mul.81.7, %integer_pow.9.3), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=27 source_end_column=50}
+  %sqrt.7.5 = f32[512]{0} sqrt(%add.50.5), metadata={op_name="jit(single_objective_fun)/vmap()/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=18 source_end_column=71}
+  %constant_37_1 = f32[] constant(0.2)
+  %broadcast.9.6 = f32[512]{0} broadcast(%constant_37_1), dimensions={}
+  %mul.82.5 = f32[512]{0} multiply(%sqrt.7.5, %broadcast.9.6), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=24 source_end_line=24 source_column=18 source_end_column=71}
+  %slice.16.11 = f32[512,1]{1,0} slice(%abs.9.31), slice={[0:512], [2:3]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=33 source_end_column=47}
+  %bitcast.7.9 = f32[512]{0} bitcast(%slice.16.11), metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=33 source_end_column=47}
+  %integer_pow.10.9 = f32[512]{0} multiply(%bitcast.7.9, %bitcast.7.9), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=33 source_end_column=47}
+  %mul.83.7 = f32[512]{0} multiply(%integer_pow.10.9, %broadcast.10.18), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=27 source_end_column=50}
+  %slice.17.5 = f32[512,1]{1,0} slice(%abs.9.31), slice={[0:512], [3:4]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=53 source_end_column=67}
+  %bitcast.8.3 = f32[512]{0} bitcast(%slice.17.5), metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=53 source_end_column=67}
+  %integer_pow.11.3 = f32[512]{0} multiply(%bitcast.8.3, %bitcast.8.3), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=53 source_end_column=67}
+  %add.51.5 = f32[512]{0} add(%mul.83.7, %integer_pow.11.3), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=27 source_end_column=50}
+  %sqrt.8.5 = f32[512]{0} sqrt(%add.51.5), metadata={op_name="jit(single_objective_fun)/vmap()/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=25 source_end_line=25 source_column=18 source_end_column=71}
+  %add.52.5 = f32[512]{0} add(%mul.82.5, %sqrt.8.5), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=26 source_end_line=26 source_column=25 source_end_column=42}
+  %slice.18.3 = f32[512,1]{1,0} slice(%abs.9.31), slice={[0:512], [4:5]}, metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=26 source_end_line=26 source_column=46 source_end_column=60}
+  %bitcast.9.4 = f32[512]{0} bitcast(%slice.18.3), metadata={op_name="jit(single_objective_fun)/vmap()/slice" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=26 source_end_line=26 source_column=46 source_end_column=60}
+  %mul.84.3 = f32[512]{0} multiply(%add.52.5, %bitcast.9.4), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=26 source_end_line=26 source_column=24 source_end_column=60}
+  %mul.85.3 = f32[512]{0} multiply(%bitcast.6.6, %broadcast.10.18), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=29 source_end_line=29 source_column=18 source_end_column=38}
+  %mul.86.5 = f32[512]{0} multiply(%integer_pow.11.3, %broadcast.10.18), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=30 source_end_line=30 source_column=53 source_end_column=76}
+  %add.53.3 = f32[512]{0} add(%integer_pow.10.9, %mul.86.5), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=30 source_end_line=30 source_column=33 source_end_column=47}
+  %sqrt.9.9 = f32[512]{0} sqrt(%add.53.3), metadata={op_name="jit(single_objective_fun)/vmap()/sqrt" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=30 source_end_line=30 source_column=24 source_end_column=77}
+  %constant_36_1 = f32[] constant(0.7)
+  %mul.48.3 = f32[512]{0} broadcast(%constant_36_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=30 source_end_line=30 source_column=18 source_end_column=77}
+  %mul.87.9 = f32[512]{0} multiply(%sqrt.9.9, %mul.48.3), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=30 source_end_line=30 source_column=18 source_end_column=77}
+  %add.54.7 = f32[512]{0} add(%mul.85.3, %mul.87.9), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=32 source_end_line=32 source_column=25 source_end_column=42}
+  %mul.88.3 = f32[512]{0} multiply(%bitcast.9.4, %broadcast.9.6), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=31 source_end_line=31 source_column=18 source_end_column=38}
+  %add.55.5 = f32[512]{0} add(%add.54.7, %mul.88.3), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=32 source_end_line=32 source_column=25 source_end_column=42}
+  %mul.89.3 = f32[512]{0} multiply(%add.55.5, %bitcast.5.8), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=32 source_end_line=32 source_column=24 source_end_column=70}
+  %max.17.3 = f32[512]{0} maximum(%mul.84.3, %mul.89.3), metadata={op_name="jit(single_objective_fun)/vmap()/max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer_constraints.py" source_line=35 source_end_line=35 source_column=23 source_end_column=64}
+  %constant_19_1 = f32[] constant(-0.640000045)
+  %broadcast.2.3 = f32[512]{0} broadcast(%constant_19_1), dimensions={}
+  %add.4.3 = f32[512]{0} add(%max.17.3, %broadcast.2.3), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=149 source_end_line=149 source_column=43 source_end_column=70}
+  %constant_41_1 = f32[] constant(0)
+  %broadcast.11.6 = f32[512]{0} broadcast(%constant_41_1), dimensions={}
+  %max.20.3 = f32[512]{0} maximum(%add.4.3, %broadcast.11.6), metadata={op_name="jit(single_objective_fun)/vmap()/jit(relu)/max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=149 source_end_line=149 source_column=31 source_end_column=71}
+  %integer_pow.14.3 = f32[512]{0} multiply(%max.20.3, %max.20.3), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=150 source_end_line=150 source_column=44 source_end_column=63}
+  %constant_34_1 = f32[] constant(100)
+  %broadcast.8.8 = f32[512]{0} broadcast(%constant_34_1), dimensions={}
+  %mul.90.3 = f32[512]{0} multiply(%integer_pow.14.3, %broadcast.8.8), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=150 source_end_line=150 source_column=23 source_end_column=63}
+  %param_2.148 = f32[512]{0} parameter(2)
+  %constant_20_1 = f32[] constant(-200)
+  %broadcast.3.3 = f32[512]{0} broadcast(%constant_20_1), dimensions={}
+  %add.5.3 = f32[512]{0} add(%param_2.148, %broadcast.3.3), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=154 source_end_line=154 source_column=39 source_end_column=64}
+  %max.22.3 = f32[512]{0} maximum(%add.5.3, %broadcast.11.6), metadata={op_name="jit(single_objective_fun)/vmap()/jit(relu)/max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=149 source_end_line=149 source_column=31 source_end_column=71}
+  %integer_pow.15.3 = f32[512]{0} multiply(%max.22.3, %max.22.3), metadata={op_name="jit(single_objective_fun)/vmap()/integer_pow" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=155 source_end_line=155 source_column=46 source_end_column=65}
+  %mul.91.5 = f32[512]{0} multiply(%integer_pow.15.3, %broadcast.8.8), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=155 source_end_line=155 source_column=25 source_end_column=65}
+  %add.56.3 = f32[512]{0} add(%mul.90.3, %mul.91.5), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=156 source_end_line=156 source_column=8 source_end_column=33}
+  ROOT %add.57.1 = f32[512]{0} add(%neg.5.3, %add.56.3), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=158 source_end_line=158 source_column=15 source_end_column=34}
+}
+
+%fused_reduce.6 (param_0.191: f32[73,512]) -> f32[512] {
+  %param_0.191 = f32[73,512]{1,0} parameter(0)
+  %constant_41_3 = f32[] constant(0)
+  %reduce_sum.38.1 = f32[512]{0} reduce(%param_0.191, %constant_41_3), dimensions={0}, to_apply=%region_0.1.clone.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  ROOT %abs.6.1 = f32[512]{0} abs(%reduce_sum.38.1), metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%fused_reduce.7 (param_0.193: f32[73,512]) -> f32[512] {
+  %param_0.193 = f32[73,512]{1,0} parameter(0)
+  %constant_41_2 = f32[] constant(0)
+  %reduce_sum.37.1 = f32[512]{0} reduce(%param_0.193, %constant_41_2), dimensions={0}, to_apply=%region_0.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  ROOT %abs.5.1 = f32[512]{0} abs(%reduce_sum.37.1), metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_add_subtract (param_0.234: f32[512], param_1.265: f32[512]) -> (f32[512], f32[512]) {
+  %constant_40_1 = f32[] constant(1)
+  %sub.37.1 = f32[512]{0} broadcast(%constant_40_1), dimensions={}, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=28 source_end_column=39}
+  %param_1.265 = f32[512]{0} parameter(1)
+  %log.5.1.clone.1 = f32[512]{0} log(%param_1.265), metadata={op_name="jit(single_objective_fun)/vmap()/log" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %param_0.234 = f32[512]{0} parameter(0)
+  %add.43.1.clone.1 = f32[512]{0} add(%log.5.1.clone.1, %param_0.234), metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %exp.10.1 = f32[512]{0} exponential(%add.43.1.clone.1), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=137 source_end_line=137 source_column=18 source_end_column=38}
+  %sub.59.1 = f32[512]{0} subtract(%sub.37.1, %exp.10.1), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=28 source_end_column=39}
+  ROOT %tuple = (f32[512]{0}, f32[512]{0}) tuple(%sub.59.1, %add.43.1.clone.1)
+}
+
+%fused_reduce.8 (param_0.221: f32[73,512]) -> f32[512] {
+  %param_0.221 = f32[73,512]{1,0} parameter(0)
+  %constant_41_4 = f32[] constant(0)
+  ROOT %reduce_sum.39.1 = f32[512]{0} reduce(%param_0.221, %constant_41_4), dimensions={0}, to_apply=%region_0.1.clone.2, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+}
+
+%fused_reduce.9 (param_0.225: f32[73,512]) -> f32[512] {
+  %param_0.225 = f32[73,512]{1,0} parameter(0)
+  %constant_47_1 = f32[] constant(-inf)
+  ROOT %reduce_max.21.1 = f32[512]{0} reduce(%param_0.225, %constant_47_1), dimensions={0}, to_apply=%region_2.8, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+}
+
+%fused_reduce.10 (param_0.226: f32[73,512]) -> f32[512] {
+  %param_0.226 = f32[73,512]{1,0} parameter(0)
+  %constant_47_2 = f32[] constant(-inf)
+  ROOT %reduce_max.22.1 = f32[512]{0} reduce(%param_0.226, %constant_47_2), dimensions={0}, to_apply=%region_2.8.clone, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+}
+
+%fused_reduce.11 (param_0.227: f32[73,512]) -> f32[512] {
+  %param_0.227 = f32[73,512]{1,0} parameter(0)
+  %constant_47_3 = f32[] constant(-inf)
+  ROOT %reduce_max.23.1 = f32[512]{0} reduce(%param_0.227, %constant_47_3), dimensions={0}, to_apply=%region_2.8.clone.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=153 source_end_line=153 source_column=21 source_end_column=63}
+}
+
+%wrapped_exponential_computation (param_0.235: f32[7444]) -> f32[7444] {
+  %param_0.235 = f32[7444]{0} parameter(0)
+  ROOT %exp.11.1 = f32[7444]{0} exponential(%param_0.235), metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=140 source_end_line=140 source_column=22 source_end_column=50}
+}
+
+ENTRY %main.15 (population.1: f32[512,5], log_source_prob_jax.1: f32[7444], param_tuple_jax_0_.1: f32[7444], param_tuple_jax_1_.1: f32[7444], param_tuple_jax_2_.1: f32[7444], param_tuple_jax_3_.1: f32[7444], param_tuple_jax_4_.1: f32[7444], param_tuple_jax_5_.1: f32[7444]) -> f32[512] {
+  %constant_13_0 = f32[22332,5]{1,0} constant({...}), metadata={op_name="jit(single_objective_fun)/vmap()/mul" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=133 source_end_line=133 source_column=28 source_end_column=81}
+  %population.1 = f32[512,5]{1,0} parameter(0), metadata={op_name="population"}
+  %custom-call.1 = (f32[22332,512]{1,0}, s8[456880]{0}) custom-call(%constant_13_0, %population.1), custom_call_target="__cublas$gemm", metadata={op_name="jit(single_objective_fun)/vmap(cvd,c->vd)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=134 source_end_line=134 source_column=18 source_end_column=72}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"gemm_backend_config":{"selected_algorithm":"-1","alpha_real":1,"beta":0,"dot_dimension_numbers":{"lhs_contracting_dimensions":["1"],"rhs_contracting_dimensions":["1"],"lhs_batch_dimensions":[],"rhs_batch_dimensions":[]},"alpha_imag":0,"precision_config":{"operand_precision":["DEFAULT","DEFAULT"],"algorithm":"ALG_UNSET"},"epilogue":"DEFAULT","lhs_stride":"111660","rhs_stride":"2560","grad_x":false,"grad_y":false,"damax_output":false},"force_earliest_schedule":false,"reification_cost":[],"device_type":"DEVICE_TYPE_INVALID"}
+  %get-tuple-element.1 = f32[22332,512]{1,0} get-tuple-element(%custom-call.1), index=0, metadata={op_name="jit(single_objective_fun)/vmap(cvd,c->vd)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=134 source_end_line=134 source_column=18 source_end_column=72}
+  %bitcast.191.0 = f32[7444,3,512]{2,1,0} bitcast(%get-tuple-element.1), metadata={op_name="jit(single_objective_fun)/vmap(cvd,c->vd)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=134 source_end_line=134 source_column=18 source_end_column=72}
+  %constant_52_0 = f32[7444,3,2]{2,1,0} constant({...})
+  %gemm_fusion_dot_general.3 = f32[7444,512,2]{2,1,0} fusion(%bitcast.191.0, %constant_52_0), kind=kCustom, calls=%gemm_fusion_dot_general.3_computation, metadata={op_name="jit(single_objective_fun)/vmap(vd,vdt->vt)/dot_general" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=83 source_end_line=83 source_column=15 source_end_column=65}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"fusion_backend_config":{"kind":"__triton_gemm","triton_gemm_config":{"block_m":"64","block_n":"16","block_k":"16","split_k":"1","num_stages":"1","num_warps":"4","num_ctas":"1","is_tma_allowed":false}},"force_earliest_schedule":false,"reification_cost":[],"device_type":"DEVICE_TYPE_INVALID"}
+  %triton_softmax.1 = f32[7444,512,2]{2,1,0} fusion(%gemm_fusion_dot_general.3), kind=kCustom, calls=%triton_softmax_computation.1, metadata={op_name="jit(single_objective_fun)/vmap()/div" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=89 source_end_line=89 source_column=29 source_end_column=99}, backend_config={"operation_queue_id":"0","wait_on_operation_queues":[],"fusion_backend_config":{"kind":"__triton","block_level_fusion_config":{"num_warps":"4","output_tiles":[{"sizes":["2","512","2"]}],"num_ctas":1,"num_stages":1,"is_tma_allowed":false}},"force_earliest_schedule":false,"reification_cost":[],"device_type":"DEVICE_TYPE_INVALID"}
+  %constant_21_0 = f32[7444]{0} constant({...}), metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=78 source_end_line=78 source_column=21 source_end_column=40}
+  %log_source_prob_jax.1 = f32[7444]{0} parameter(1), metadata={op_name="log_source_prob_jax"}
+  %param_tuple_jax_0_.1 = f32[7444]{0} parameter(2), metadata={op_name="param_tuple_jax[0]"}
+  %param_tuple_jax_1_.1 = f32[7444]{0} parameter(3), metadata={op_name="param_tuple_jax[1]"}
+  %param_tuple_jax_2_.1 = f32[7444]{0} parameter(4), metadata={op_name="param_tuple_jax[2]"}
+  %param_tuple_jax_3_.1 = f32[7444]{0} parameter(5), metadata={op_name="param_tuple_jax[3]"}
+  %param_tuple_jax_4_.1 = f32[7444]{0} parameter(6), metadata={op_name="param_tuple_jax[4]"}
+  %param_tuple_jax_5_.1 = f32[7444]{0} parameter(7), metadata={op_name="param_tuple_jax[5]"}
+  %loop_add_log_fusion = (f32[7444,512]{1,0}, f32[7444,512]{1,0}) fusion(%log_source_prob_jax.1, %param_tuple_jax_3_.1, %param_tuple_jax_2_.1, %param_tuple_jax_1_.1, %constant_21_0, /*index=5*/%triton_softmax.1, %param_tuple_jax_0_.1, %param_tuple_jax_5_.1, %param_tuple_jax_4_.1, %get-tuple-element.1), kind=kLoop, calls=%fused_add_log, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  %get-tuple-element.5 = f32[7444,512]{1,0} get-tuple-element(%loop_add_log_fusion), index=1, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  %input_reduce_fusion.5 = f32[73,512]{1,0} fusion(%get-tuple-element.5, %log_source_prob_jax.1), kind=kInput, calls=%fused_reduce.5, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %input_reduce_fusion.9 = f32[512]{0} fusion(%input_reduce_fusion.5), kind=kInput, calls=%fused_reduce.9, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52 deduplicated_name="input_reduce_fusion.9"}
+  %loop_select_fusion = f32[512]{0} fusion(%input_reduce_fusion.9), kind=kLoop, calls=%fused_select, metadata={op_name="jit(single_objective_fun)/vmap()/select_n" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52 deduplicated_name="loop_select_fusion"}
+  %input_reduce_fusion.4 = f32[73,512]{1,0} fusion(%loop_select_fusion, %get-tuple-element.5, %log_source_prob_jax.1), kind=kInput, calls=%fused_reduce.4, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52}
+  %input_reduce_fusion.7 = f32[512]{0} fusion(%input_reduce_fusion.4), kind=kInput, calls=%fused_reduce.7, metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=118 source_end_line=118 source_column=22 source_end_column=52 deduplicated_name="input_reduce_fusion.6"}
+  %loop_add_subtract_fusion = (f32[512]{0}, f32[512]{0}) fusion(%loop_select_fusion, %input_reduce_fusion.7), kind=kLoop, calls=%fused_add_subtract, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=28 source_end_column=39}
+  %get-tuple-element.2 = f32[512]{0} get-tuple-element(%loop_add_subtract_fusion), index=0, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=28 source_end_column=39}
+  %get-tuple-element.3 = f32[512]{0} get-tuple-element(%loop_add_subtract_fusion), index=1, metadata={op_name="jit(single_objective_fun)/vmap()/sub" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=141 source_end_line=141 source_column=28 source_end_column=39}
+  %get-tuple-element.4 = f32[7444,512]{1,0} get-tuple-element(%loop_add_log_fusion), index=0, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=123 source_end_line=123 source_column=21 source_end_column=69}
+  %input_reduce_fusion.3 = f32[73,512]{1,0} fusion(%get-tuple-element.4), kind=kInput, calls=%fused_reduce.3, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %input_reduce_fusion.10 = f32[512]{0} fusion(%input_reduce_fusion.3), kind=kInput, calls=%fused_reduce.10, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52 deduplicated_name="input_reduce_fusion.9"}
+  %loop_select_fusion.1 = f32[512]{0} fusion(%input_reduce_fusion.10), kind=kLoop, calls=%fused_select.1, metadata={op_name="jit(single_objective_fun)/vmap()/select_n" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52 deduplicated_name="loop_select_fusion"}
+  %input_reduce_fusion.2 = f32[73,512]{1,0} fusion(%get-tuple-element.4, %loop_select_fusion.1), kind=kInput, calls=%fused_reduce.2, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %input_reduce_fusion.6 = f32[512]{0} fusion(%input_reduce_fusion.2), kind=kInput, calls=%fused_reduce.6, metadata={op_name="jit(single_objective_fun)/vmap()/abs" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52 deduplicated_name="input_reduce_fusion.6"}
+  %loop_add_fusion = f32[512]{0} fusion(%loop_select_fusion.1, %input_reduce_fusion.6), kind=kLoop, calls=%fused_add, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=124 source_end_line=124 source_column=22 source_end_column=52}
+  %wrapped_exponential = f32[7444]{0} fusion(%log_source_prob_jax.1), kind=kLoop, calls=%wrapped_exponential_computation, metadata={op_name="jit(single_objective_fun)/vmap()/exp" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=140 source_end_line=140 source_column=22 source_end_column=50}
+  %input_reduce_fusion.1 = f32[73,512]{1,0} fusion(%wrapped_exponential, %get-tuple-element.3, %get-tuple-element.4, %loop_add_fusion, %get-tuple-element.2, /*index=5*/%get-tuple-element.5, %log_source_prob_jax.1), kind=kInput, calls=%fused_reduce.1, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+  %input_reduce_fusion.8 = f32[512]{0} fusion(%input_reduce_fusion.1), kind=kInput, calls=%fused_reduce.8, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_sum" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=142 source_end_line=142 source_column=80 source_end_column=86}
+  %input_reduce_fusion = f32[73,512]{1,0} fusion(%get-tuple-element.1), kind=kInput, calls=%fused_reduce, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=153 source_end_line=153 source_column=21 source_end_column=63}
+  %input_reduce_fusion.11 = f32[512]{0} fusion(%input_reduce_fusion), kind=kInput, calls=%fused_reduce.11, metadata={op_name="jit(single_objective_fun)/vmap()/reduce_max" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=153 source_end_line=153 source_column=21 source_end_column=63 deduplicated_name="input_reduce_fusion.9"}
+  ROOT %loop_add_fusion.1 = f32[512]{0} fusion(%input_reduce_fusion.8, %population.1, %input_reduce_fusion.11), kind=kLoop, calls=%fused_add.1, metadata={op_name="jit(single_objective_fun)/vmap()/add" source_file="/home/mikael/bayesian_localization_perf_study/src/ABL/optimizer.py" source_line=158 source_end_line=158 source_column=15 source_end_column=34}
+}
+
