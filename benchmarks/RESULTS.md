@@ -68,3 +68,33 @@ python hlo_traffic.py results/de_objective_hlo.txt > results/de_objective_traffi
 The number of kernels launched was 22. A cuBLAS gemm kernel multiplies a [22332 x 5] matrix by [5 x 512] and gets [22332 x 512]: that is the E-field of every candidate at every vertex. This operation writes roughly 46 MB. The data sizes are estimated from the HLO by `hlo_traffic.py`, assumign each inputs and outputs are read/written once. A large chain of operations of E-field magnitude, angle, sigmoid, and logs are fused in to a single kernel: `loop_add_log_fusion`.
 
 The total read/write is 430 MB per call, which with the 1.541 ms duration 280 GB/s. This is close to the 4060 Ti limit of 288 GB/s, so the differential evolution may be memory-bound. The choose_next_stimulus() was timed to 0.3396 s, which is on average 1.7 ms per step. The objective evaluation thus takes around 90% of the time during the optimization.
+
+## Nsight Systems profiling
+
+So far we have used per-function timing for the session loop, PyTorch Profiler with the `localize()` method, and optimizer step timing and GPU kernel usage stats from XLA HLO for the DE objective function evaluation. Now we'll use Nsight Systems to profile the session loop, giving us a complete picture of the function and kernel timings. 
+
+The following command runs the `run_session()` throug the Nsight Systems profiler:
+
+```
+nsys profile -o results/nsys_session_nodes --trace=cuda,nvtx,osrt --cuda-graph-trace=node \
+    --force-overwrite=true python run_session.py --trials 10 --warmup 1 --out results/nsys_run_nodes.json
+```
+
+Then, get the stats for NVTX ranges (wall-clock time on the CPU) and CUDA kernels.
+
+```
+nsys stats --report nvtx_gpu_proj_sum,cuda_gpu_kern_sum \
+    results/nsys_session_nodes.nsys-rep > results/nsys_stats_nodes_2026-10-21.txt
+```
+XLA runs the DE loop body as a CUDA graph with one lauch call. Therefore, we need the `--cuda-graph-trace=node` option to see inside it.
+
+From `nsys_stats_nodes_2026-10-21.txt`, we can see a few things:
+- 37220 calls are made to various kernels like `larft`, `orgqr`, `lacpy` and `batch_eye`. These belong to the QR decomposition that is done during the session setup. 372200 = 7444 vertices x 5 coils. The NVTX shows `gemm-fusion-autotuner` taking 659 ms, and during this time XLA tries different kernels during compilation to find the fastest.
+
+`nsys_stats_2026-10-21.txt` shows the stats when the CUDA graph is not traced, and transfertimes between host and device. I produced the report with:
+
+```
+nsys stats --report cuda_gpu_kern_sum,cuda_api_sum,nvtx_sum,cuda_gpu_mem_time_sum \
+    results/nsys_session.nsys-rep > results/nsys_stats_2026-10-21.txt
+```
+We see that the total time for host-to-device and device-to-host transfers were 2.9 ms and 1.4 ms, respectively. Therefore, the device transfer overhead is insignificant.
