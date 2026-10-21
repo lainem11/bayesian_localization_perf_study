@@ -61,4 +61,8 @@ Running `profile_de.py` profiles a single run of the 200-step differential evolu
 ```
 python profile_de.py > results/profile_de_2026-10-20.txt
 ```
-The results show a median of 2.5 ms per optimization step when each step is synced. Without sync, an iteration averages just 1.5 ms. The number of kernels launched was 22. The biggest fused matrices have shape [22332,512], where 22332 = 7444 * 3, the E-field matrix flattened, and 512 is the population size. That has the size of (22332 * 512) * 4 / 1024 / 1024 = 44 MB. That is more than the GPU L2 cache of 32 MB. There was roughly four kernels with similar size. Some with shape [7444,512,2] are used in the response function, and they are the electric fields with one dimension dropped. These count to 29 MB, and may demonstrate a way to reduce the memory load.
+The results show a median of 2.5 ms per optimization step when each step is synced. Without sync, an iteration averages just 1.5 ms. We can see the kernel stats from the XLA HLO dump, which can be formatted nicely with command:
+```
+python hlo_traffic.py results/de_objective_hlo.txt > results/de_objective_traffic.txt
+```
+The number of kernels launched was 22. A cuBLAS gemm kernel multiplies a [22332 x 5] matrix by [5 x 512] and gets [22332 x 512]: that is the E-field of every candidate at every vertex. This operation writes roughly 46 MB. The total read/write is 430 MB per call, which with the 1.541 ms duration 280 GB/s. This is close to the 4060 Ti limit of 288 GB/s, so the differential evolution may be memory-bound. The choose_next_stimulus() was timed to 0.3396 s, which is on average 1.7 ms per step. The objective evaluation thus takes most of the time during the optimization.
