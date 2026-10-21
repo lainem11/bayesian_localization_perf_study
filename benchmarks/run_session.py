@@ -12,10 +12,11 @@ from env_info import collect_env
 
 def timed(name, fn, *args):
     torch.cuda.synchronize()
-    t0 = time.perf_counter()
-    result = fn(*args)
-    torch.cuda.synchronize()
-    t1 = time.perf_counter()
+    with torch.cuda.nvtx.range(name):
+        t0 = time.perf_counter()
+        result = fn(*args)
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
     return result, name, t1-t0
 
 def to_jsonable(obj):
