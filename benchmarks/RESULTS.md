@@ -355,28 +355,38 @@ python run_session.py --repeats 3 --fixed_steps results/2026-10-22_baseline_pinn
 
 **Conclusion.** Both fixed runs are faster than both baseline runs, by about 7–14 ms (1–2%). The two baseline runs differ from each other by 6 ms, so the effect is only slightly larger than the run-to-run variation. Removing the sync gains at most ~1–2%. A deployable version would change step counts (level-2 equivalence), so it is not pursued now.
 
-## 2.2 Merged Adam
+## 2.2 Step (b1): merged Adam parameter groups
 
-The profiling of `localize` showed 2700 calls to `aten::_foreach_...` type operations (see `profile_localize_2026-10-20` or `profile_localize_b1_base`), which points to the six parameter groups as 2700 calls / 450 optimization steps = 6. As the optimizer uses setting = `foreach=True` is launches kernels for each paramter separately. Thus, the launch-bound `localize` may get speed-up from merging the parameter operations.
+**Hypothesis.** In `profile_localize_2026-10-20.txt`, each `aten::_foreach_*` op has 2700 calls = 6 per Adam step (2700 / 450 steps). `_setup_optimizer` puts each of the 6 parameters in its own parameter group, and `foreach=True` batches tensors only within a group, so every op launches 6 times. One update over all 6 tensors should cut launches and speed up the launch-bound `localize`.
 
-I created an alternative Adam optimizer setup that does this in `merged_adam.py`. I ran a test with the harness using the base vs merged Adam with two repeats each with:
-
+**Method.** `merged_adam.py` replaces `_setup_optimizer` at run time with an Adam that makes each of the 7 foreach calls of PyTorch's `_multi_tensor_adam` once over all 6 tensors, with a per-tensor list of learning rates. Same operations in the same order, so the trajectory must stay identical. Runs at commit `6d66aeb`, clean tree, autotuning file loaded, alternating A B A B:
 ```
 export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
 python run_session.py --repeats 3 --out results/2026-10-22_b1_base1.json
 python run_session.py --repeats 3 --merged_adam --out results/2026-10-22_b1_merged1.json
-python run_session.py --repeats 3 --out results/2026-10-22_b1_base2.json
-python run_session.py --repeats 3 --merged_adam --out results/2026-10-22_b1_merged2.json
+(same again as b1_base2, b1_merged2)
 python compare.py results/2026-10-22_baseline_pinned_r3.json results/2026-10-22_b1_merged1.json
 ```
 
-TODO: Insert result table here.
+**Results.** `compare.py`: all identical. `localize` median (IQR) over 147 trials per file:
 
-`localize` got about 18% faster. I then ran it through the profiler:
+| base1 | merged1 | base2 | merged2 |
+|---:|---:|---:|---:|
+| 0.5813 (0.0188) | 0.4749 (0.0185) | 0.5853 (0.0168) | 0.4778 (0.0190) |
 
+`localize` is ~18% faster (≈ −107 ms per call); the two baseline runs differ by 4 ms.
+
+**Profile** (commit `82fcac5`, 3 `localize` calls = 450 Adam steps):
 ```
-export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
 python profile_localize.py > results/profile_localize_b1_base.txt
 python profile_localize.py --merged_adam > results/profile_localize_b1_merged.txt
 ```
-Calls to `cudaLaunchKernel` dropped from 85809 to 70059, corresponding exatcly to merging the seven foreach operations for each of the six parameters to a single call across all parameters; reduction of 7*(6-1)*450 launches. The `localize` CPU total fell by 2.897 - 2.428 = 0.469 s, and `cudaLaunchKernel` CPU by 0.173s, so launches explain only 37% of the drop.
+
+| | base | merged |
+|---|---:|---:|
+| `cudaLaunchKernel` calls | 85,809 | 70,059 |
+| `cudaLaunchKernel` CPU total | 1051.4 ms | 878.5 ms |
+| `localize` CPU total | 2.897 s | 2.428 s |
+| Self CUDA time total | 189.7 ms | 161.4 ms |
+
+**Conclusion.** Launches dropped by exactly 7 ops × 5 × 450 = 15,750: each foreach op now launches once per step instead of 6 times. Launch CPU time explains only 0.173 s (37%) of the 0.469 s drop in `localize` CPU time; the rest is other CPU time, not yet broken down. The biggest remaining op is `aten::mul` (24,345 calls ≈ 54 per step, forward and backward of the loss), a candidate for fusion with `torch.compile`.
