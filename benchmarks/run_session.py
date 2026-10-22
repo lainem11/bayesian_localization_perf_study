@@ -39,7 +39,10 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-
+        # Check for looping options from arguments
+    if args.fixed_steps is not None:
+        install(args.fixed_steps)
+        
     all_runs = []
 
     for r in range(args.repeats):
@@ -48,10 +51,6 @@ if __name__ == "__main__":
         # Initialize a LocalizationSession
         S, name, dur = timed("make_session() duration", make_session)
         results[name].append(dur)
-
-        # Check for looping options from arguments
-        if args.fixed_steps is not None:
-            install(args.fixed_steps)
         
         # Run trials
         ses_t0 = time.perf_counter()
