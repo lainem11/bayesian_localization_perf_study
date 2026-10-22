@@ -32,6 +32,7 @@ def collect_env():
     my_dict["JAX CUDA libs version"] = importlib.metadata.version("jax-cuda12-plugin")
     my_dict["JAX devices"] = jax.devices()
     my_dict["XLA_PYTHON_CLIENT_PREALLOCATE"] = os.getenv('XLA_PYTHON_CLIENT_PREALLOCATE')
+    my_dict["XLA_FLAGS"] = os.getenv("XLA_FLAGS")
     my_dict["EvoSax version"] = importlib.metadata.version("evosax")
     my_dict["NumPyro version"] = numpyro.__version__
     my_dict["Python version"] = platform.python_version()
