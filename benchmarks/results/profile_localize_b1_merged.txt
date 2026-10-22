@@ -1,0 +1,89 @@
+GIT branch: perf-study
+GIT commit: 82fcac5e893105e3f0bb0ce1e13f968dba0bd505
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                               localize         0.00%       0.000us         0.00%       0.000us       0.000us        2.423s      1501.43%        2.423s     807.829ms             3  
+                                               localize        43.93%        1.576s        67.65%        2.428s     809.242ms       0.000us         0.00%      79.279ms      26.426ms             3  
+                                              aten::mul         5.92%     212.317ms        15.10%     541.739ms      22.253us      48.877ms        30.28%      48.888ms       2.008us         24345  
+      autograd::engine::evaluate_function: MulBackward0         1.73%      62.227ms         9.95%     357.243ms      44.104us       0.000us         0.00%      33.445ms       4.129us          8100  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us      20.775ms        12.87%      20.775ms       1.536us         13524  
+void at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us      20.223ms        12.53%      20.223ms       3.199us          6321  
+                                           MulBackward0         0.49%      17.656ms         5.66%     202.997ms      25.061us       0.000us         0.00%      20.189ms       2.492us          8100  
+                                             aten::mean         1.18%      42.187ms         2.30%      82.466ms      26.180us      14.707ms         9.11%      14.707ms       4.669us          3150  
+void at::native::reduce_kernel<512, 1, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us      14.707ms         9.11%      14.707ms       4.669us          3150  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us      14.089ms         8.73%      14.089ms       1.735us          8121  
+    autograd::engine::evaluate_function: ClampBackward1         0.27%       9.820ms         4.40%     157.817ms     116.901us       0.000us         0.00%      12.936ms       9.582us          1350  
+                                         ClampBackward1         0.34%      12.124ms         4.12%     147.997ms     109.628us       0.000us         0.00%      12.936ms       9.582us          1350  
+      autograd::engine::evaluate_function: PowBackward0         0.38%      13.503ms         6.37%     228.487ms      84.625us       0.000us         0.00%      12.218ms       4.525us          2700  
+                                           PowBackward0         0.43%      15.575ms         5.99%     214.984ms      79.624us       0.000us         0.00%      12.218ms       4.525us          2700  
+                                              aten::div         1.83%      65.819ms         3.93%     140.922ms      23.979us      12.085ms         7.49%      12.085ms       2.056us          5877  
+                                              aten::sum         0.74%      26.489ms         1.63%      58.359ms      21.566us      10.375ms         6.43%      10.375ms       3.834us          2706  
+void at::native::reduce_kernel<128, 4, at::native::R...         0.00%       0.000us         0.00%       0.000us       0.000us      10.360ms         6.42%      10.360ms       3.833us          2703  
+                                              aten::add         1.28%      46.106ms         3.15%     113.216ms      20.885us      10.100ms         6.26%      10.102ms       1.863us          5421  
+                                              aten::pow         1.52%      54.427ms         4.13%     148.147ms      27.435us       4.119ms         2.55%       7.914ms       1.465us          5400  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       7.880ms         4.88%       7.880ms       1.751us          4500  
+                                            aten::clamp         1.05%      37.647ms         2.52%      90.560ms      22.229us       7.197ms         4.46%       7.197ms       1.767us          4074  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       7.197ms         4.46%       7.197ms       1.767us          4074  
+     autograd::engine::evaluate_function: MeanBackward0         0.43%      15.549ms         3.27%     117.362ms      37.258us       0.000us         0.00%       5.977ms       1.898us          3150  
+                                          MeanBackward0         0.18%       6.570ms         2.84%     101.812ms      32.321us       0.000us         0.00%       5.977ms       1.898us          3150  
+void at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us       5.977ms         3.70%       5.977ms       1.898us          3150  
+                                             aten::add_         0.68%      24.334ms         1.77%      63.420ms      10.062us       5.891ms         3.65%       5.891ms       0.935us          6303  
+                                              aten::neg         0.61%      21.826ms         1.61%      57.763ms      18.320us       5.220ms         3.23%       5.220ms       1.655us          3153  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       5.220ms         3.23%       5.220ms       1.655us          3153  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       4.979ms         3.08%       4.979ms       1.844us          2700  
+      autograd::engine::evaluate_function: DivBackward0         0.15%       5.258ms         1.31%      47.061ms      52.289us       0.000us         0.00%       4.797ms       5.330us           900  
+                                           DivBackward0         0.12%       4.327ms         1.16%      41.803ms      46.447us       0.000us         0.00%       4.797ms       5.330us           900  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       4.652ms         2.88%       4.652ms       2.580us          1803  
+autograd::engine::evaluate_function: torch::autograd...         1.27%      45.399ms         3.24%     116.302ms      43.075us       0.000us         0.00%       4.603ms       1.705us          2700  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       4.119ms         2.55%       4.119ms       1.525us          2700  
+                                            aten::copy_         0.36%      12.872ms         1.67%      59.799ms      16.460us       3.854ms         2.39%       3.854ms       1.061us          3633  
+                         Memcpy DtoD (Device -> Device)         0.00%       0.000us         0.00%       0.000us       0.000us       3.854ms         2.39%       3.854ms       1.409us          2736  
+                                            aten::where         0.31%      10.963ms         0.88%      31.502ms      23.335us       3.682ms         2.28%       3.682ms       2.727us          1350  
+void at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us       3.682ms         2.28%       3.682ms       2.727us          1350  
+                                              aten::sub         0.34%      12.363ms         0.80%      28.579ms      15.720us       3.634ms         2.25%       3.634ms       1.999us          1818  
+void at::native::elementwise_kernel<128, 2, at::nati...         0.00%       0.000us         0.00%       0.000us       0.000us       3.308ms         2.05%       3.308ms       3.603us           918  
+                                              aten::cos         0.20%       7.092ms         0.54%      19.224ms      21.219us       2.769ms         1.72%       2.769ms       3.056us           906  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       2.769ms         1.72%       2.769ms       3.056us           906  
+                                              aten::sin         0.17%       6.277ms         0.48%      17.343ms      19.143us       2.706ms         1.68%       2.706ms       2.986us           906  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       2.706ms         1.68%       2.706ms       2.986us           906  
+                                     aten::logical_and_         0.06%       2.149ms         0.57%      20.348ms      15.073us       0.000us         0.00%       2.536ms       1.879us          1350  
+                                      aten::logical_and         0.16%       5.680ms         0.51%      18.199ms      13.481us       2.536ms         1.57%       2.536ms       1.879us          1350  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       2.536ms         1.57%       2.536ms       1.879us          1350  
+                                               aten::ge         0.44%      15.750ms         0.84%      30.227ms      22.390us       2.500ms         1.55%       2.500ms       1.852us          1350  
+                                               aten::le         0.24%       8.570ms         0.61%      22.069ms      16.347us       2.480ms         1.54%       2.480ms       1.837us          1350  
+      autograd::engine::evaluate_function: ExpBackward0         0.15%       5.498ms         0.89%      31.963ms      35.514us       0.000us         0.00%       2.388ms       2.653us           900  
+                                            aten::fill_         0.24%       8.517ms         0.90%      32.386ms      17.639us       2.379ms         1.47%       2.379ms       1.296us          1836  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       2.379ms         1.47%       2.379ms       1.296us          1836  
+                                aten::_foreach_addcdiv_         0.09%       3.245ms         0.26%       9.165ms      20.368us       2.195ms         1.36%       2.195ms       4.878us           450  
+void at::native::(anonymous namespace)::multi_tensor...         0.00%       0.000us         0.00%       0.000us       0.000us       2.195ms         1.36%       2.195ms       4.878us           450  
+void at::native::vectorized_elementwise_kernel<4, at...         0.00%       0.000us         0.00%       0.000us       0.000us       1.865ms         1.16%       1.865ms       2.052us           909  
+                                              aten::exp         0.30%      10.863ms         0.68%      24.460ms      26.998us       1.859ms         1.15%       1.859ms       2.051us           906  
+                                    aten::scalar_tensor         0.10%       3.594ms         0.88%      31.727ms      23.502us       0.000us         0.00%       1.739ms       1.288us          1350  
+                                           ExpBackward0         0.07%       2.434ms         0.54%      19.482ms      21.647us       0.000us         0.00%       1.682ms       1.868us           900  
+      autograd::engine::evaluate_function: AddBackward0         0.66%      23.695ms         1.18%      42.299ms       7.231us       0.000us         0.00%       1.617ms       0.276us          5850  
+                                    aten::_foreach_div_         0.08%       2.790ms         0.25%       9.068ms      20.151us       1.602ms         0.99%       1.602ms       3.561us           450  
+-------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 3.589s
+Self CUDA time total: 161.412ms
+
+cudaLaunchKernel               calls=70059    cpu_total=878.5 ms
+aten::item                     calls=6312     cpu_total=43.4 ms
+aten::_local_scalar_dense      calls=6312     cpu_total=39.9 ms
+cudaStreamSynchronize          calls=465      cpu_total=26.8 ms
