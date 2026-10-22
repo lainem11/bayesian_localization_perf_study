@@ -1,5 +1,4 @@
 import jax
-jax.config.update("jax_log_compiles", True)
 from shapes import make_session
 import torch
 import numpy as np
@@ -35,10 +34,14 @@ def parse_args():
     p.add_argument("--repeats", type=int, default=1, help="session repeats (R)")
     p.add_argument("--out", type=Path, default=Path("results.json"), help="output path")
     p.add_argument("--fixed_steps", type=Path, default=None)
+    p.add_argument("--log_compiles", action="store_true", help="print JAX compilation log")
+
     return p.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
+    jax.config.update("jax_log_compiles", args.log_compiles)
+
         # Check for looping options from arguments
     if args.fixed_steps is not None:
         install(args.fixed_steps)
