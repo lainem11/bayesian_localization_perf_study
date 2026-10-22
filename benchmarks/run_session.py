@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 from env_info import collect_env
+from fixed_steps import install
 
 def timed(name, fn, *args):
     torch.cuda.synchronize()
@@ -33,6 +34,7 @@ def parse_args():
     p.add_argument("--warmup", type=int, default=1, help="warmup iterations (K)")
     p.add_argument("--repeats", type=int, default=1, help="session repeats (R)")
     p.add_argument("--out", type=Path, default=Path("results.json"), help="output path")
+    p.add_argument("--fixed_steps", type=Path, default=None)
     return p.parse_args()
 
 if __name__ == "__main__":
@@ -47,10 +49,12 @@ if __name__ == "__main__":
         S, name, dur = timed("make_session() duration", make_session)
         results[name].append(dur)
 
-        # Run warmup
-        ses_t0 = time.perf_counter()
-
+        # Check for looping options from arguments
+        if args.fixed_steps is not None:
+            install(args.fixed_steps)
+        
         # Run trials
+        ses_t0 = time.perf_counter()
         for i in range(S.trial_number, args.trials):
 
             results["trial number"].append(S.trial_number)
