@@ -325,3 +325,32 @@ Wall-time shares: harness baseline (`2026-10-20_baseline_r3.json`). GPU-time sha
 - `Self CPU time total` adds up time across threads (backward runs on its own thread), so it can exceed elapsed time.
 - Use medians: trial 1 skews means.
 - Redirecting output into tracked files marked the tree dirty; `collect_env` now ignores `benchmarks/results/`.
+
+# Phase 2: Framework-level optimization
+
+## 2.0 Reproducibility: XLA autotuning
+
+The 10-22 baseline at `1ba1067` (`2026-10-22_baseline_r3_unpinned.json`) differed from `2026-10-20_baseline_r3.json` from trial 1, with no code changes. The committed HLO dumps show why: the E-field matmul is cuBLAS in `de_objective_hlo.txt` at `63622a0` and a Triton GEMM at `51d02dd`. XLA's autotuner picks the faster implementation at compile time, and the choice changed between processes. The two kernels round differently, and the DE amplifies the difference. (A run with `--xla_gpu_enable_triton_gemm=false` restored the old trial-1 `didt`; that output was not saved.)
+
+Fix: autotuning results are saved once and loaded in every run ([persisted autotuning](https://openxla.org/xla/persisted_autotuning)). `autotune/rtx4060ti.textproto` (`a50aa8b`) pins cuBLAS for the E-field matmul, i.e. the original state. With it loaded, `compare.py results/2026-10-20_baseline_r3.json results/2026-10-22_baseline_pinned_r3.json` reports all identical. `collect_env()` records `XLA_FLAGS`. All Phase 2 runs load this file.
+
+Day-to-day drift with identical trajectories: `localize` median 0.5863 s (10-20) vs 0.5730 s (10-22 pinned), `choose_next_stimulus` 0.3396 s vs 0.3436 s. Effects below ~2% therefore need before and after runs interleaved in one sitting.
+
+## 2.1 Step (a): per-step `loss.item()`
+
+**Hypothesis.** The per-step sync is cheap (Phase 1: 465 syncs = 10.7 ms over 3 calls, ~0.6% of `localize`).
+
+**Method.** `fixed_steps.py` replaces the fitting loop at run time with one that runs the step counts recorded in the reference file, with no `.item()` and no convergence check. Same arithmetic, so the trajectory must stay identical. Runs alternated A B A B, commit `4720545`, autotuning file loaded:
+```
+python run_session.py --repeats 3 --out results/2026-10-22_a_base1.json
+python run_session.py --repeats 3 --fixed_steps results/2026-10-22_baseline_pinned_r3.json --out results/2026-10-22_a_fixed1.json
+(same again as a_base2, a_fixed2)
+```
+
+**Results.** `compare.py` against the pinned baseline: all identical for all four files. `localize` median (IQR) over 147 trials per file:
+
+| base1 | fixed1 | base2 | fixed2 |
+|---:|---:|---:|---:|
+| 0.5912 (0.0153) | 0.5845 (0.0137) | 0.5972 (0.0299) | 0.5831 (0.0183) |
+
+**Conclusion.** Both fixed runs are faster than both baseline runs, by about 7–14 ms (1–2%). The two baseline runs differ from each other by 6 ms, so the effect is only slightly larger than the run-to-run variation. Removing the sync gains at most ~1–2%. A deployable version would change step counts (level-2 equivalence), so it is not pursued now.
