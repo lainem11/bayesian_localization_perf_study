@@ -354,3 +354,29 @@ python run_session.py --repeats 3 --fixed_steps results/2026-10-22_baseline_pinn
 | 0.5912 (0.0153) | 0.5845 (0.0137) | 0.5972 (0.0299) | 0.5831 (0.0183) |
 
 **Conclusion.** Both fixed runs are faster than both baseline runs, by about 7–14 ms (1–2%). The two baseline runs differ from each other by 6 ms, so the effect is only slightly larger than the run-to-run variation. Removing the sync gains at most ~1–2%. A deployable version would change step counts (level-2 equivalence), so it is not pursued now.
+
+## 2.2 Merged Adam
+
+The profiling of `localize` showed 2700 calls to `aten::_foreach_...` type operations (see `profile_localize_2026-10-20` or `profile_localize_b1_base`), which points to the six parameter groups as 2700 calls / 450 optimization steps = 6. As the optimizer uses setting = `foreach=True` is launches kernels for each paramter separately. Thus, the launch-bound `localize` may get speed-up from merging the parameter operations.
+
+I created an alternative Adam optimizer setup that does this in `merged_adam.py`. I ran a test with the harness using the base vs merged Adam with two repeats each with:
+
+```
+export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
+python run_session.py --repeats 3 --out results/2026-10-22_b1_base1.json
+python run_session.py --repeats 3 --merged_adam --out results/2026-10-22_b1_merged1.json
+python run_session.py --repeats 3 --out results/2026-10-22_b1_base2.json
+python run_session.py --repeats 3 --merged_adam --out results/2026-10-22_b1_merged2.json
+python compare.py results/2026-10-22_baseline_pinned_r3.json results/2026-10-22_b1_merged1.json
+```
+
+TODO: Insert result table here.
+
+`localize` got about 18% faster. I then ran it through the profiler:
+
+```
+export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
+python profile_localize.py > results/profile_localize_b1_base.txt
+python profile_localize.py --merged_adam > results/profile_localize_b1_merged.txt
+```
+Calls to `cudaLaunchKernel` dropped from 85809 to 70059, corresponding exatcly to merging the seven foreach operations for each of the six parameters to a single call across all parameters; reduction of 7*(6-1)*450 launches. The `localize` CPU total fell by 2.897 - 2.428 = 0.469 s, and `cudaLaunchKernel` CPU by 0.173s, so launches explain only 37% of the drop.
