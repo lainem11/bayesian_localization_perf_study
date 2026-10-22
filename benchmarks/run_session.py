@@ -8,7 +8,8 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 from env_info import collect_env
-from fixed_steps import install
+import fixed_steps
+import merged_adam
 
 def timed(name, fn, *args):
     torch.cuda.synchronize()
@@ -35,17 +36,18 @@ def parse_args():
     p.add_argument("--out", type=Path, default=Path("results.json"), help="output path")
     p.add_argument("--fixed_steps", type=Path, default=None)
     p.add_argument("--log_compiles", action="store_true", help="print JAX compilation log")
-
+    p.add_argument("--merged_adam", action="store_true", help="merge parameter operations")
     return p.parse_args()
 
 if __name__ == "__main__":
     args = parse_args()
     jax.config.update("jax_log_compiles", args.log_compiles)
 
-        # Check for looping options from arguments
+    # Check for looping options from arguments
     if args.fixed_steps is not None:
-        install(args.fixed_steps)
-        
+        fixed_steps.install(args.fixed_steps)
+    if args.merged_adam:
+        merged_adam.install()
     all_runs = []
 
     for r in range(args.repeats):
