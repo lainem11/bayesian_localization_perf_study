@@ -10,6 +10,7 @@ from collections import defaultdict
 from env_info import collect_env
 import fixed_steps
 import merged_adam
+import compiled_loss
 
 def timed(name, fn, *args):
     torch.cuda.synchronize()
@@ -37,6 +38,7 @@ def parse_args():
     p.add_argument("--fixed_steps", type=Path, default=None)
     p.add_argument("--log_compiles", action="store_true", help="print JAX compilation log")
     p.add_argument("--merged_adam", action="store_true", help="merge parameter operations")
+    p.add_argument("--compile_loss", action="store_true", help="use torch.compile for the loss function")
     return p.parse_args()
 
 if __name__ == "__main__":
@@ -48,6 +50,8 @@ if __name__ == "__main__":
         fixed_steps.install(args.fixed_steps)
     if args.merged_adam:
         merged_adam.install()
+    if args.compile_loss:
+        compiled_loss.install()
     all_runs = []
 
     for r in range(args.repeats):
