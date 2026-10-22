@@ -106,7 +106,8 @@ if __name__ == "__main__":
 
     # Summary of per-stage timings (only post-warmup trials are timed)
     # Per-trial stages only; "total session duration" has one entry per run
-    stages = [k for k in all_runs[0] if k.endswith("() duration")]
+    stages = [k for k in all_runs[0]
+              if k.endswith("() duration") and k != "make_session() duration"]
     n = sum(len(run[stages[0]][args.warmup:]) for run in all_runs) if stages else 0
     print(f"\nTiming summary over {n} trials (excluding first {args.warmup} per run), seconds:")
     print(f"{'stage':<40}{'median':>10}{'IQR':>10}{'Q1':>10}{'Q3':>10}")
