@@ -1,0 +1,43 @@
+version: 3
+results {
+  device: "CUDA: 8.9, Cores: 34, GPU clock: 2.565 GHz, Memory bandwidth: 288 GB/s, L2 cache: 32 MB, DNN version: 9.10.2"
+  hlo: "(f32[22332,512]{1,0}, s8[456880]{0}) custom-call(f32[22332,5]{1,0}, f32[512,5]{1,0}), custom_call_target=\"__cublas$gemm\", backend_config={\"device_type\":\"DEVICE_TYPE_INVALID\",\"force_earliest_schedule\":false,\"gemm_backend_config\":{\"alpha_imag\":0,\"alpha_real\":1,\"beta\":0,\"damax_output\":false,\"dot_dimension_numbers\":{\"lhs_batch_dimensions\":[],\"lhs_contracting_dimensions\":[\"1\"],\"rhs_batch_dimensions\":[],\"rhs_contracting_dimensions\":[\"1\"]},\"epilogue\":\"DEFAULT\",\"grad_x\":false,\"grad_y\":false,\"lhs_stride\":\"111660\",\"precision_config\":{\"algorithm\":\"ALG_UNSET\",\"operand_precision\":[\"DEFAULT\",\"DEFAULT\"]},\"rhs_stride\":\"2560\"},\"operation_queue_id\":\"0\",\"reification_cost\":[],\"wait_on_operation_queues\":[]}"
+  result {
+    gemm {
+      algorithm: -1
+    }
+  }
+  version: 12
+}
+results {
+  device: "CUDA: 8.9, Cores: 34, GPU clock: 2.565 GHz, Memory bandwidth: 288 GB/s, L2 cache: 32 MB, DNN version: 9.10.2"
+  hlo: "{\n  tmp_0 = f32[22332,5]{1,0} parameter(0)\n  tmp_1 = f32[512,5]{1,0} parameter(1)\n  tmp_2 = f32[22332,512]{1,0} dot(f32[22332,5]{1,0} tmp_0, f32[512,5]{1,0} tmp_1), lhs_contracting_dims={1}, rhs_contracting_dims={1}\n  ROOT tmp_3 = f32[7444,3,512]{2,1,0} bitcast(f32[22332,512]{1,0} tmp_2)\n}"
+  result {
+    gemm {
+      algorithm: -1
+    }
+    run_time {
+      nanos: 168960
+    }
+  }
+  version: 12
+}
+results {
+  device: "CUDA: 8.9, Cores: 34, GPU clock: 2.565 GHz, Memory bandwidth: 288 GB/s, L2 cache: 32 MB, DNN version: 9.10.2"
+  hlo: "{\n  tmp_0 = f32[7444,3,512]{2,1,0} parameter(0)\n  tmp_1 = f32[7444,3,2]{2,1,0} parameter(1)\n  ROOT tmp_2 = f32[7444,512,2]{2,1,0} dot(f32[7444,3,512]{2,1,0} tmp_0, f32[7444,3,2]{2,1,0} tmp_1), lhs_batch_dims={0}, lhs_contracting_dims={1}, rhs_batch_dims={0}, rhs_contracting_dims={1}\n}"
+  result {
+    run_time {
+      nanos: 311296
+    }
+    triton {
+      block_m: 64
+      block_n: 16
+      block_k: 16
+      split_k: 1
+      num_stages: 1
+      num_warps: 4
+      num_ctas: 1
+    }
+  }
+  version: 12
+}
