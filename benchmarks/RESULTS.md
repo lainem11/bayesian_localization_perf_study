@@ -1,123 +1,327 @@
-Testing done on WSL2. This might add some overhead to every launch and sync, compared to native Linux. 
+# ABL GPU performance study: results log
 
+Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-# Baseline test
+**Status:** Phase 0 (baseline) and Phase 1 (profiling) are complete. Phase 2 (framework-level optimization) is next.
 
-The script "run_session.py" runs simulations of the ABL localization session, including session setup and iterations of electric field optimization, response simulation, and localization analysis. The execution times of the key functions are recorded for each trial, among other information, stored in /results.
+## Setup
 
-Repeating sessions are verified to be bitwise identical across 3 repeats (didt, responses, Adam steps) due to the default seeds that are created during the LocalizationSession instantiation.
+| Item | Value |
+|---|---|
+| GPU | NVIDIA GeForce RTX 4060 Ti, 16 GB |
+| Driver | 610.88 (Windows driver, used through WSL2) |
+| OS | Windows 11 + WSL2 (Linux 6.18.54.1-microsoft-standard-WSL2, glibc 2.43) |
+| Python | 3.13.16 |
+| PyTorch | 2.12.0+cu126 (built with CUDA 12.6) |
+| JAX / jaxlib / jax-cuda12-plugin | 0.7.2 / 0.7.2 / 0.7.2 |
+| evosax / numpyro | 0.2.0 / 0.20.1 |
+| Profilers | PyTorch Profiler; Nsight Systems CLI 2026.5.1 and Nsight Compute, both installed from NVIDIA's packages inside WSL |
 
-Here's the command I ran:
+**Limitations.** WSL2 adds overhead to every kernel launch and synchronization compared with native Linux, and the GPU also drives the display. Small-kernel timings are therefore somewhat pessimistic.
+
+**Branch and code state.** Work is on branch `perf-study`. The JAX/PyTorch E-field projection inconsistency (mean subtraction applied only in JAX) was fixed upstream in `61a9084` *before* any measurement; its numerical effect was on the order of 1e-6. A shutdown fix for `torch.cuda.empty_cache()` followed in `ffd7b30`. No other `src/` changes have been made.
+
+**Workflow.** Commit code → run on a clean tree → commit results and the log entry. Every results file records the git commit and a dirty flag. The dirty flag ignores `benchmarks/results/`, so redirecting output into that folder doesn't mark the run dirty.
+
+### Benchmark scripts (`benchmarks/`)
+
+| Script | Purpose |
+|---|---|
+| `env_info.py` | `collect_env()`: git state, GPU, driver, library versions, XLA preallocation setting |
+| `shapes.py` | `make_session()` builds a standard session; prints tensor shapes |
+| `run_session.py` | Benchmark harness (see Phase 0) |
+| `compare.py REF NEW` | Checks two results files for bitwise-identical `didt`, responses and Adam step counts |
+| `profile_localize.py` | PyTorch Profiler on 3 `localize()` calls |
+| `profile_de.py` | Times the DE objective (synced and back-to-back) and dumps its compiled HLO |
+| `hlo_traffic.py` | Estimates per-kernel memory traffic from an HLO dump |
+| `simple_sync_test.py` | Demonstrates asynchronous GPU execution |
+
+---
+
+# Phase 0: Baseline
+
+## 0.1 Problem size
+
+From `shapes.py`:
+
+| Tensor | Shape | dtype / device |
+|---|---|---|
+| `efield_set` | [5, 7444, 3] (0.43 MB) | float32, cuda |
+| `efield_basis` | [7444, 3, 2] | float32, cuda |
+| `null_dir_basis` | [1, 7444, 2] | float32, cuda |
+| `efield_trials` (trial buffer) | [150, 7444, 3] | float32, cuda |
+
+5 coils, 7444 ROI vertices. The trial buffer is preallocated for 150 trials, so a 50-trial session never reallocates.
+
+## 0.2 Harness
+
+`run_session.py` runs simulated sessions (source vertex 2679, `silent_mode=True`).
+
+- **Timing:** every stage of every trial (`choose_next_stimulus`, `record_efield_trial`, `simulate_response`, `localize`) is timed with `time.perf_counter()`, with `torch.cuda.synchronize()` before and after. Without the syncs, a timer measures only how long the work took to *queue*, because GPU calls return before the GPU has finished. `make_session()` is timed the same way, and each stage is wrapped in an NVTX range for Nsight Systems.
+- **Recorded per trial:** chosen `didt`, response, number of Adam steps, posterior argmax (read outside the timed sections, because it forces a sync).
+- **Warm-up:** all trials are stored; the summary excludes the first `--warmup` trials of each run.
+- **Seeding:** `LocalizationSession.__init__` and `initialize_trials` call `_utils.set_random_seed()` (seed 10), and the optimizer seeds its Sobol sampler and JAX key with 0. Seeds set outside the session are overwritten, so the harness has no `--seed` option.
+- **Caveat:** the syncs around each stage stop the CPU from queuing the next stage while the GPU is busy, so stage times can add up to slightly more than an unsynced trial.
+
+## 0.3 Baseline timing
+
+Command (commit `45cd423`, clean tree):
 ```
 python run_session.py --repeats 3 --warmup 1 --out results/2026-10-20_baseline_r3.json
 ```
-The command defaults to 50 trials. In the end, it prints a table of the per-function execution times, which are wall-clock with a sync around each stage:
+50 trials × 3 repeats; statistics over 147 trials (first trial of each run excluded), wall-clock with a sync around each stage:
 
-Timing summary over 147 trials (excluding first 1 per run), seconds:
+| Stage | Median (s) | IQR (s) | Q1 (s) | Q3 (s) | Share of trial |
+|---|---:|---:|---:|---:|---:|
+| `choose_next_stimulus` | 0.3396 | 0.0008 | 0.3391 | 0.3400 | 36.6% |
+| `record_efield_trial` | 0.0002 | 0.0000 | 0.0002 | 0.0002 | <0.1% |
+| `simulate_response` | 0.0011 | 0.0001 | 0.0010 | 0.0012 | 0.1% |
+| `localize` | 0.5863 | 0.0196 | 0.5766 | 0.5962 | 63.2% |
 
-| Stage | Median (s) | IQR (s) | Q1 (s) | Q3 (s) |
-|---|---:|---:|---:|---:|
-| `choose_next_stimulus()` duration | 0.3396 | 0.0008 | 0.3391 | 0.3400 |
-| `record_efield_trial()` duration | 0.0002 | 0.0000 | 0.0002 | 0.0002 |
-| `simulate_response()` duration | 0.0011 | 0.0001 | 0.0010 | 0.0012 |
-| `localize()` duration | 0.5863 | 0.0196 | 0.5766 | 0.5962 |
+Total session time: 51.8 s, 49.6 s and 49.5 s for the three runs. The first run is longer because it includes one-time process initialization.
 
-Total session duration (per run): 49.6045 s
+**`localize` doesn't get slower as trials accumulate.** It fits on 2 trials at the start and 50 at the end, yet stays at ~0.55–0.62 s. Its time follows the number of Adam steps instead: trials that converged early (60, 103 and 121 steps instead of 150) were proportionally faster. Dividing `localize` time by Adam steps in the baseline file gives **~3.9 ms per step**, regardless of step count or trial count. This was the first hint that `localize` is limited by fixed per-step overhead, not by arithmetic (confirmed in Phase 1).
 
-It shows that choose_next_stimulus() and localize() are the duration bottlenecks, with localize() taking about two times longer in comparison.
+## 0.4 First-trial cost
 
-The result file "2026-10-20_baseline_r3.json" also shows that the duration is significantly longer for the first trial. With choose_next_stimulus, this is expected due to the JIT precompilation which takes around 4 seconds. The other functions are also slower on the first trial but only for the very first repeat. This is probably because PyTorch loads GPU kernels and reserves memory. The number of compilations done by JAX drops after the first session, so repeated sessions re-use some operations.
+| Trial 1 | Run 1 | Run 2 | Run 3 |
+|---|---:|---:|---:|
+| `choose_next_stimulus` | 4.24 s | 3.70 s | 3.75 s |
+| `localize` | 2.31 s | 0.59 s | 0.59 s |
+| `simulate_response` | 0.15 s | 0.001 s | 0.001 s |
 
-The result file also confirms the determinism, as the didt values which the electric field optimizer returns are equal across repeats.
+- **Once per session: JAX compilation (~3.7 s).** Each new `LocalizationSession` creates new jitted functions, so the DE scan (`jit(scan)`, ~1.8 s to compile in one logged run) and the objective (~0.8 s) recompile in every session. With `jax.config.update("jax_log_compiles", True)`, there were no compilations after trial 1 within a session. One session logged 27 compilations and three sessions logged 68, so later sessions reuse only a few small one-off operations. (Compile counts are from console output that wasn't saved.)
+- **Once per process: PyTorch initialization.** `localize` and `simulate_response` are slow only in the first session of the process: PyTorch loads GPU kernels and libraries and reserves memory on first use.
+- One warm-up trial per session is enough.
 
-### Hotfix
+## 0.5 Session setup
 
-I removed implementation of a random seed in run_session.py because it had not effect, since seeds are set inside the LocalizationSession class, and it's verified to work.
+Command (commit `51d02dd`, clean tree):
+```
+python run_session.py --repeats 1 --trials 3 --out results/2026-10-21_baseline_r1.json
+```
+`make_session()` took **4.26 s** (single run, first session in the process, so it includes CUDA initialization). The breakdown is not measured yet; see Phase 1 for the QR kernels it launches.
 
-## Baseline test summary
+## 0.6 Determinism and equivalence checking
 
-I now have a reproducible benchmark harness. The results file records the environment and git state, and it times every stage of every trial, with syncs around each stage. The session runs are bitwise deterministic across repeats and processes.
+- Within `2026-10-20_baseline_r3.json`, all three runs have bitwise-identical `didt`, responses and Adam step counts, and all end at the true source vertex 2679.
+- `compare.py results/2026-10-20_baseline_r3.json results/2026-10-20_baseline_r3_rerun.json` reports **all identical**. The rerun was a separate process (commit `631beb9`, dirty tree with benchmark-only changes), so the result holds across processes too.
 
-On the benchmark system, `localize()` has a 0.586 s median per trial (IQR 0.020) and `choose_next_stimulus` a 0.340 s (IQR 0.001). Each session is around 50 s.
+Two levels of equivalence will be used in Phase 2:
+1. **Bitwise (`compare.py`)** for changes that shouldn't touch the maths (removing a sync, caching a value). The whole trajectory must stay identical.
+2. **Tolerance-based, per stage on fixed inputs** for changes that alter floating-point order (`torch.compile`, custom kernels, dtypes). The DE feedback loop amplifies tiny differences, so whole trajectories can't be compared. `localize` will be replayed on recorded trials (`import_trial_data`) and the DE objective evaluated on a fixed population. Not built yet.
 
-First trial costs split into JIT recompilation in every session (~3.7 s) and PyTorch initializations.
+## Phase 0 summary
 
-# Profiling
+**Can claim:**
+- Built a reproducible benchmark harness that records the environment and git state and times every stage of every trial with explicit synchronization.
+- Baseline on an RTX 4060 Ti (WSL2), 50-trial session, 3 repeats: `localize` 0.586 s (IQR 0.020) and `choose_next_stimulus` 0.340 s (IQR 0.001) per trial; ~50 s per session; `make_session` 4.26 s.
+- First-trial cost splits into JAX recompilation per session (~3.7 s) and PyTorch initialization per process.
+- Sessions are bitwise deterministic across repeats and processes, with a script to verify it.
 
-## localize()
+**Cannot claim yet (at the end of Phase 0):** why either stage is slow; any speedup.
 
-Running the script `profile_localize.py` run PyTorch Profiler to calculate CPU and CUDA durations for various functions calls inside the `localize()` function. The profiling records three calls of the `localize()` function, after a warm-up, and saves the results as a table. I used the command:
+---
+
+# Phase 1: Profiling
+
+## 1.1 Asynchronous execution check
+
+`simple_sync_test.py` times an 8192 × 8192 matrix multiply. The call *returned* after 0.191 ms, but the work *finished* after 84.7 ms (console output, not saved). GPU calls return as soon as the work is queued, so timing requires an explicit sync (`torch.cuda.synchronize()`, `.item()`, or `block_until_ready()` in JAX). That's why the harness syncs around every stage.
+
+As a side calculation: 2 × 8192³ ≈ 1.1 × 10¹² operations in 84.7 ms is ~13 TFLOP/s for this matmul.
+
+## 1.2 `localize()` with PyTorch Profiler
+
+Command (code = `4fed753` + the script as committed in `7fb35e9`; this output has no environment header):
 ```
 python profile_localize.py > results/profile_localize_2026-10-20.txt
 ```
+The script warms up with 10 trials, then profiles 3 `localize()` calls (each labelled with `record_function("localize")`).
 
-code = 4fed753 + the script as committed in 7fb35e9 / 63622a0
+**Reading the table.** With GPU recording on, each labelled region appears twice:
+- A **CPU-side row** (CPU columns filled). Its *CUDA total* is the summed duration of the kernels launched inside it: GPU *busy* time.
+- A **GPU-side marker row** (CPU columns zero, odd percentages above 100%). Its *Self CUDA* is the window on the GPU timeline from first to last kernel, *including idle gaps*.
 
-The profiling slows down the execution somewhat, with 2.735/3 = 0.91 s duration per call compared to 0.59 recorded at the baseline. Most of the time goes on the CPU: Python code and launch overhead. The whole-run GPU busy fraction was 205 ms / 2.735 s = 7.5%. A total of 85809 CUDA kernels were launched, with about 1006 ms / 85809 = 12 us of CPU time and 205 ms / 85809 = 2.4 us of GPU time per kernel. Therefore, CPU dominates the per-kernel times. One Adam step launches around 190 kernels. The Adam step uses on average 1.271 ms of CPU time versus 140 us of GPU time. So GPU is busy roughly 10% of the time. The computation is launch-bound and the fix is to send fewer launches and less Python per step. We also see that cudaStreamSynchronize has a total CPU time of 10.7 ms. This around 0.4% of the wall time, so the sync is not a bottleneck to the performance here.
+**Results:**
 
-## choose_next_stimulus()
+| Quantity | Value | Source (row, column) |
+|---|---:|---|
+| Elapsed time, 3 calls | 2.735 s (0.91 s per call; profiler overhead vs 0.59 s in the harness) | `localize` CPU row, CPU total |
+| GPU kernel time, whole run | 204.9 ms | last line, Self CUDA time total |
+| GPU busy fraction | 204.9 / 2735 = **7.5%** | derived |
+| Kernel launches | **85,809** (≈ **190 per Adam step**: 3 calls × 150 steps = 450 steps) | `cudaLaunchKernel` calls |
+| CPU time per launch | 1006.1 ms / 85,809 = **11.7 µs** | `cudaLaunchKernel` cpu_total |
+| GPU time per kernel (average) | 204.9 ms / 85,809 = **2.4 µs** | derived |
+| Adam step | 1.271 ms CPU vs 139.6 µs GPU per step (~11% busy) | `Optimizer.step#Adam.step` CPU row, CPU time avg and CUDA time avg |
+| Example op `aten::mul` | 20.5 µs CPU vs 1.9 µs GPU per call; 24,345 calls (54 per step) | `aten::mul` row |
+| Python time | 1.474 s Self CPU inside `localize` (time not inside any PyTorch op) | `localize` CPU row, Self CPU |
+| GPU syncs | 465 `cudaStreamSynchronize` = 10.7 ms total | sync rows |
 
-Running `profile_de.py` profiles a single run of the 200-step differential evolution optimization inside the `choose_next_stimulus()` method, after a 3-trial warm-up. I ran it with:
+**Interpretation.**
+- A **kernel** is one function the CPU asks the GPU to run over a whole tensor. In eager PyTorch that's roughly one kernel per tensor operation.
+- Each kernel finishes in ~2 µs, but the CPU needs ~12 µs to launch the next one, plus Python time. The GPU is idle ~92% of the time waiting for work. `localize` is **CPU-overhead-bound** (launch-bound plus Python), which explains the constant ~3.9 ms per Adam step from Phase 0.
+- **Syncs are cheap here.** The 465 syncs are 450 `loss.item()` calls (one per step) plus 15 others (5 per `localize`: the `vector_angle` check, `isnan().any()`, etc.). Together they cost 10.7 ms, **~0.4% of elapsed time**. A sync waits for the GPU to finish its queue, and this GPU is almost always already idle.
+- **Non-sync `.item()` calls.** `aten::item` ran 6,312 times (14 per step), but most read CPU tensors and don't wait for the GPU. Likely breakdown: 1 is `loss.item()`, 1 is the convergence `if` on the CPU `losses` tensor, and 12 are Adam reading its CPU step counters (6 groups × 2).
+- **Lead for Phase 2.** The Adam `_foreach_*` kernels each run 2,700 times = 6 per step. `_setup_optimizer` puts each of the 6 parameters in its own group with its own learning rate, so the "foreach" batching launches once per group instead of once in total.
+
+## 1.3 DE objective in JAX
+
+Command (commit `7a0fb51`, clean tree):
 ```
 python profile_de.py > results/profile_de_2026-10-21.txt
-```
-The results show a median of 2.5 ms per objective call when each step is synced. Without sync, an iteration averages just 1.5 ms. We can see the kernel stats from the XLA HLO dump, which can be formatted nicely with command:
-```
 python hlo_traffic.py results/de_objective_hlo.txt > results/de_objective_traffic.txt
 ```
-The number of kernels launched was 22. A cuBLAS gemm kernel multiplies a [22332 x 5] matrix by [5 x 512] and gets [22332 x 512]: that is the E-field of every candidate at every vertex. This operation writes roughly 46 MB. The data sizes are estimated from the HLO by `hlo_traffic.py`, assumign each inputs and outputs are read/written once. A large chain of operations of E-field magnitude, angle, sigmoid, and logs are fused in to a single kernel: `loop_add_log_fusion`.
+`profile_de.py` runs 3 trials, then calls the jitted objective on a random population of 512 candidates.
 
-The total read/write is 430 MB per call, which with the 1.541 ms duration 280 GB/s. This is close to the 4060 Ti limit of 288 GB/s, so the differential evolution may be memory-bound. The choose_next_stimulus() was timed to 0.3396 s, which is on average 1.7 ms per step. The objective evaluation thus takes around 90% of the time during the optimization.
+**Timing:**
 
-## Nsight Systems profiling
+| Measurement | Value |
+|---|---:|
+| Synced (wait after every call), median | 2.481 ms (IQR 0.033) |
+| Back-to-back (200 calls queued, one wait at the end) | **1.544 ms per call** |
+| Whole DE per generation (0.3396 s / 200, baseline) | 1.70 ms |
 
-So far we have used per-function timing for the session loop, PyTorch Profiler with the `localize()` method, and optimizer step timing and GPU kernel usage stats from XLA HLO for the DE objective function evaluation. Now we'll use Nsight Systems to profile the session loop, giving us a complete picture of the function and kernel timings. 
+The synced time includes ~0.94 ms per call of dispatch and waiting, which disappears inside the scan. **The objective is ~91% of each DE generation** (1.544 / 1.70). evosax's ask/tell make up the rest (~0.15 ms).
 
-The following command runs the `run_session()` throug the Nsight Systems profiler:
+**What XLA compiled** (from `de_objective_hlo.txt`; `hlo_traffic.py` lists each kernel with its read and write sizes):
+- **22 kernels** per objective call.
+- The vmapped einsum over coils became **one cuBLAS matrix multiply**, [22332 × 5] × [5 × 512] → [22332 × 512] (22332 = 7444 vertices × 3 components). That is the E-field of all 512 candidates at all vertices: 46 MB written.
+- `efield_set * max_current_slope` was folded into a compile-time constant (`constant_13_0`), so it isn't recomputed per candidate.
+- The whole elementwise chain (magnitude, angle, sigmoid, logs, both posterior numerators) is **fused into one kernel**, `loop_add_log_fusion`.
+- The remaining kernels are reductions: two passes per logsumexp (max, then sum), the expected change, and the E-field max penalty, which re-reads the 46 MB E-field array.
 
+**Memory traffic model.** Assuming each kernel reads its inputs once and writes its outputs once: 291.6 MB read + 138.6 MB written = **~430 MB per call**. 430 MB / 1.544 ms ≈ **278 GB/s**, against NVIDIA's spec of ~288 GB/s for the 4060 Ti. Reaching ~97% of spec is unusually high, which suggests part of the traffic is served from the 32 MB L2 cache. With 512 candidates the main intermediate arrays are 15–46 MB each, mostly larger than L2.
+
+*Note:* `de_objective_hlo.txt` was regenerated when `profile_de.py` ran under Nsight Compute (commit `51d02dd`). Running `hlo_traffic.py` on the new file gives the same 22 kernels and 430 MB.
+
+**Hypothesis after this step:** the DE objective is memory-bound because it writes and re-reads ~430 MB of large intermediate arrays per generation (tested in 1.5).
+
+## 1.4 Whole session with Nsight Systems
+
+Two traces of a 10-trial session, both with commit `f840466` code (NVTX labels added):
 ```
+# Trace A: default CUDA-graph tracing; includes API and memory-copy summaries
+nsys profile -o results/nsys_session --trace=cuda,nvtx,osrt --force-overwrite=true \
+    python run_session.py --trials 10 --warmup 1 --out results/nsys_run.json
+nsys stats --report cuda_gpu_kern_sum,cuda_api_sum,nvtx_sum,cuda_gpu_mem_time_sum \
+    results/nsys_session.nsys-rep > results/nsys_stats_2026-10-21.txt
+
+# Trace B: kernels inside CUDA graphs traced individually
 nsys profile -o results/nsys_session_nodes --trace=cuda,nvtx,osrt --cuda-graph-trace=node \
     --force-overwrite=true python run_session.py --trials 10 --warmup 1 --out results/nsys_run_nodes.json
-```
-
-Then, get the stats for NVTX ranges (wall-clock time on the CPU) and CUDA kernels.
-
-```
 nsys stats --report nvtx_gpu_proj_sum,cuda_gpu_kern_sum \
     results/nsys_session_nodes.nsys-rep > results/nsys_stats_nodes_2026-10-21.txt
 ```
-XLA runs the DE loop body as a CUDA graph with one lauch call. Therefore, we need the `--cuda-graph-trace=node` option to see inside it.
+(Trace B also includes the `make_session()` timer added in `0fea58b`. Ubuntu's own `nsight-systems` package couldn't convert traces because its importer was missing; NVIDIA's package works.)
 
-From `nsys_stats_nodes_2026-10-21.txt`, we can see a few things:
-- Median time for `localize` is 935 ms, for `choose_next_stimulus` 331 ms and for `make_session()` 7.2 s. While `choose_next_stimulus` timing is close to what we measured earlier with per-function timing (339.6 ms) `localize` slowed down considerably from its recorded 586 ms time. This is likely due to the number of kernels launched, which we measured before at 85809 for `localize`. I also recorded the time for `make_session` outside nsys, with results in `2026-10-21_baseline_r1.json` revealing 4.2 s time. Delay here is likely for the same reason of kernel launching.
-- 37220 calls are made to various kernels like `larft`, `orgqr`, `lacpy` and `batch_eye`. These belong to the QR decomposition that is done during the session setup. 37220 = 7444 vertices x 5 coils (PCA dimensions). The NVTX shows `gemm-fusion-autotuner` taking 659 ms, and during this time XLA tries different kernels during compilation to find the fastest.
+**Stage times under nsys (NVTX ranges = CPU wall-clock, medians):**
 
-`nsys_stats_2026-10-21.txt` shows the stats when the CUDA graph is not traced, and transfertimes between host and device. I produced the report with:
+| Stage | nsys median | Harness median | Change |
+|---|---:|---:|---:|
+| `choose_next_stimulus` | 330.8 ms | 339.6 ms | ≈ same |
+| `localize` | 935.4 ms | 586.3 ms | **+60%** |
 
-```
-nsys stats --report cuda_gpu_kern_sum,cuda_api_sum,nvtx_sum,cuda_gpu_mem_time_sum \
-    results/nsys_session.nsys-rep > results/nsys_stats_2026-10-21.txt
-```
-We see that the total time for host-to-device and device-to-host transfers were 1.4 ms and 2.9 ms, respectively. Therefore, the device transfer overhead is insignificant.
+nsys records every CUDA API call, and this session made 621,335 `cudaLaunchKernel` calls (Trace A, `cuda_api_sum`). Launch-heavy code suffers most from that recording overhead, so `localize`'s slowdown is further evidence that it is launch-bound. Means are misleading here because trial 1 takes 2.6 s and 6.9 s, so medians are used.
 
-## Nsight Compute profiling for single kernel
+**CUDA graphs in JAX.** In Trace A the DE kernels are missing from the kernel summary. Instead there are 4,040 `cuGraphLaunch` calls and NVTX ranges named `command_buffer`. XLA records the scan body's kernels once as a **CUDA graph** and replays the whole sequence with a single launch call, which removes per-kernel launch overhead. This is why the DE is not launch-bound. Trace B (`--cuda-graph-trace=node`) lists the kernels inside the graphs.
 
-The largest single kernel is the `loop_add_log_fusion`, used by the `choose_next_stimulus()`. I profiled it using Nsight Compute with command:
+**GPU time by stage** (derived by hand from Trace B `cuda_gpu_kern_sum`, 10 trials, grouping kernels by name and instance count):
 
+| Group | How identified | GPU time | Share (excl. setup) |
+|---|---|---:|---:|
+| DE loop (JAX) | ~2,000–2,016 instances each (`loop_add_log_fusion`, `gemm_fusion_dot_general_9`, `triton_softmax_1`, reductions, `ampere_sgemm`, …) | 3,596 ms | **~88%** |
+| PyTorch | `at::native::…` kernels | 464 ms | **~12%** |
+| Session setup | 37,220 / 74,440 instances (QR, see below) | 383 ms | – |
+
+**The DE uses ~7× more GPU time than `localize`, while `localize` takes more wall time.** On average the DE kernels add up to ~360 ms per trial (including trial 1), about the same as the DE's ~331 ms wall time. So the GPU is busy nearly the whole time during the DE ("~100%" is approximate, because node-level tracing inflates kernel durations). During `localize` the GPU is mostly idle.
+
+**DE kernel durations** (Trace B, average) with read+write sizes from the HLO model:
+
+| Kernel | Avg time | MB moved (model) | Implied bandwidth |
+|---|---:|---:|---:|
+| `loop_add_log_fusion` | 496 µs | 107 | ~216 GB/s |
+| `gemm_fusion_dot_general_9` (2D projection) | 381 µs | 76 | ~200 GB/s |
+| `triton_softmax_1` (normalization) | 256 µs | 61 | ~238 GB/s |
+| `input_reduce_fusion` (E-field max penalty) | 212 µs | 46 | ~216 GB/s |
+| `ampere_sgemm_128x64_tn` (matmul) | 118 µs | 46 | ~390 GB/s |
+
+The matmul's apparent bandwidth exceeds the spec, which is only possible if part of its 46 MB output stays in L2 and is read from there by the next kernel. The per-kernel model doesn't capture caching. These durations add up to ~1.75 ms per generation, above the 1.544 ms back-to-back time, which is consistent with node-level tracing adding a small cost per kernel.
+
+**Note on `nvtx_gpu_proj_sum`.** Its "projected time" is the span on the GPU timeline from the start of a range's first kernel to the end of its last, gaps included, *not* the summed busy time. For `localize`, projected time (11,049 ms) ≈ range time (11,051 ms). Busy time therefore has to come from the kernel summary, as above.
+
+**Session setup (QR decomposition).** The kernels `larft`, `orgqr`, `lacpy`, `batch_eye` and `copy_info_kernel` each ran exactly 37,220 times, and `gemmSN_NN` ran 74,440 times. These are the building blocks of a QR decomposition, called from `torch.pca_lowrank` in `EFieldModel.apply_pca` during `make_session()`. The template arguments `<float, 5, 3>` show each vertex's matrix is 5 × 3 (coils × xyz). 37,220 = 7444 × 5. *Hypothesis:* `pca_lowrank` calls QR 5 times (its default `niter=2`), and the batched QR is solved one tiny matrix at a time. Under nsys `make_session()` took 7.27 s, vs 4.26 s without nsys (0.5), consistent with ~300k traced launches. A breakdown of setup time is still to do.
+
+**Compile-time autotuning.** NVTX shows XLA's `gemm-fusion-autotuner` pass taking 659 ms during the first compilation of the objective. The kernels `xla_fp_comparison`, `Redzone…` and two ~28 ms `cutlass` kernels are the autotuner trying candidate GEMM implementations. This is part of the trial-1 cost.
+
+**Host↔device transfers** (Trace A, `cuda_gpu_mem_time_sum`): host→device 1.4 ms, device→host 2.9 ms of GPU time for the whole session. **Negligible.**
+
+## 1.5 One kernel with Nsight Compute
+
+Command (commit `df9cc66`, clean tree):
 ```
 ncu --kernel-name regex:loop_add_log_fusion --launch-skip 20 --launch-count 1 \
     --section SpeedOfLight \
     --metrics dram__bytes_read.sum,dram__bytes_write.sum,gpu__time_duration.sum \
     python profile_de.py > results/ncu_loop_add_log_2026-10-21.txt
 ```
+`loop_add_log_fusion` is the largest single kernel (~21% of all GPU time in Trace B). Nsight Compute replays it while reading hardware counters. Grid: 7444 blocks × 128 threads.
 
-From the result file `ncu_loop_add_log_2026-10-21.txt`, we see a 77 MB read and 21 MB write. In `de_objective_traffic.txt` we estimated these numbers as 77 MB and 31 MB, respectively. The memory throughput is 93% and compute throughput 28%. Indeed, the DE is memory-bound.
+| Metric | Measured | Model (`hlo_traffic.py`) |
+|---|---:|---:|
+| DRAM bytes read | 77.2 MB | 76.5 MB |
+| DRAM bytes written | 20.6 MB | 30.5 MB |
+| Duration | 377 µs | – |
+| Memory (DRAM) throughput | **92.7%** of peak | – |
+| Compute (SM) throughput | **28.1%** of peak | – |
 
-# Bottleneck table
+- **Memory-bound.** Memory throughput is near its limit while the arithmetic units are mostly idle.
+- **Bandwidth cross-check:** 97.8 MB / 377 µs ≈ 259 GB/s. ncu reports a DRAM frequency of 8.74 GHz, which on the 128-bit bus gives a ~280 GB/s peak; 259 / 280 ≈ 93%, consistent with the reported throughput.
+- **Fewer writes than the model.** About 10 MB of the output is still in L2 when the kernel ends, and the next kernels read it from there. The model is not a lower bound: caching can make real traffic smaller.
+- **Caveats.**
+  - The duration here (377 µs) is shorter than the 496 µs in the node-level nsys trace. Node tracing inflates kernel times, so per-kernel figures should come from ncu.
+  - The timing lines at the top of this output file were measured while ncu was replaying kernels and are not valid timings.
 
-| Stage | Share of time | evidence | hypethesis | verdict
-|---|---:|---:|---:|---:|
-| `choose_next_stimulus()`| 36.7% | Total read/write close to theoretical limit, 90% of time is spent on objective evaluation, only 22 kernels launched with most of them small, largest kernel has 93% memory throughput and 28% compute throughput | Most of the time is spent on read and write, due to the large matrices involved | memory-bounded |
-| `record_efield_trial()`| 0% | - | - | - |
-| `simulate_response()` duration | 0% | - | - | - |
-| `localize()` duration | 63.3% | GPU busy-time of 7.5%, 85809 CUDA kernels launched, insignificant sync overhead| Most of time is spent launching CUDE kernels | launch-bounded |
+## 1.6 Bottleneck table
+
+Wall-time shares: harness baseline (`2026-10-20_baseline_r3.json`). GPU-time shares: Trace B (`nsys_stats_nodes_2026-10-21.txt`), session setup excluded.
+
+| # | Hypothesis | Stage | Share of wall time | Share of GPU time | Evidence (source) | Verdict |
+|---|---|---|---:|---:|---|---|
+| 1 | The DE objective dominates GPU time per trial | `choose_next_stimulus` | 36.6% | ~88% | DE kernels 3,596 ms vs PyTorch 464 ms over 10 trials; GPU busy ~100% during the DE; objective is 91% of each generation (`nsys_stats_nodes`, `profile_de`) | **Confirmed** for GPU time; not the largest share of wall time |
+| 2 | The DE is memory-bound because of large intermediate arrays | `choose_next_stimulus` | (as #1) | (as #1) | Elementwise chain fused into 1 kernel; 22 kernels; ~430 MB per call (model). `loop_add_log_fusion`: DRAM 92.7%, SM 28.1%, 77.2 MB read / 20.6 MB written (`de_objective_traffic`, `ncu_loop_add_log`) | **Confirmed** for the largest kernel; others consistent by duration |
+| 3 | The Adam loop is launch/overhead-bound | `localize` | 63.2% | ~12% | ≈190 launches per step; 11.7 µs CPU per launch vs 2.4 µs GPU per kernel; GPU busy 7.5%; 1.47 s Python self-time; ~3.9 ms per step regardless of data size; +60% under nsys (`profile_localize`, `baseline_r3`, `nsys_stats`) | **Confirmed**: CPU-side overhead (Python + launches) |
+| 4 | `loss.item()` every step is a costly sync | `localize` | ~0.4% | – | 465 syncs (450 in the loop) = 10.7 ms; GPU never behind the CPU (`profile_localize`) | **Rejected**. Phase 2 prediction: removing it changes `localize` by <2% |
+| 5 | `vector_angle`'s data-dependent `if` (host sync) matters | `localize` | negligible | – | Among the 15 non-loop syncs per 3 calls, inside the 10.7 ms of #4 (`profile_localize`) | **Rejected** |
+| 6 | E-field magnitude and angle recomputed twice per `localize` matter | `localize` | negligible | negligible | A few dozen kernels out of ~28,600 per call (kernel-count estimate, not timed separately) | **Negligible** (estimate) |
+| 7 | Per-trial host↔device transfers matter | all | – | <0.5% | H→D 1.4 ms, D→H 2.9 ms for a 10-trial session (`nsys_stats`) | **Rejected** |
+| 8 | JAX recompiles | `choose_next_stimulus` | trial 1 only | – | No compiles after trial 1 within a session; ~3.7 s recompile per new session; separately, PyTorch init once per process (`baseline_r3`, compile log) | **Confirmed per session**; none within a session |
+| 9 | NVML can't separate PyTorch and JAX memory; use per-framework stats | – | – | – | Not measured | **Not tested** |
+| 10 | (new) Session setup is expensive | `make_session` | once per experiment | – | 4.26 s (clean single run, includes process init); QR kernels 37,220 calls each, 383 ms GPU, from `torch.pca_lowrank` (`baseline_r1`, `nsys_stats_nodes`) | **Open**: breakdown needed |
+| 11 | (new) XLA autotuning adds to the first compile | `choose_next_stimulus` | trial 1 only | – | `gemm-fusion-autotuner` 659 ms; autotuner kernels in the trace (`nsys_stats`) | **Confirmed** as part of the trial-1 cost |
+
+**In short:** the DE uses most of the GPU and is memory-bound. `localize` uses most of the wall time and is CPU-overhead-bound with the GPU mostly idle. They need different fixes: fewer bytes moved for the DE, fewer launches and less Python per step for `localize`.
+
+## Phase 1 summary
+
+**Can claim:**
+- Profiled a mixed PyTorch + JAX application with PyTorch Profiler, Nsight Systems and Nsight Compute, and read XLA's compiled HLO to see what the compiler actually generated.
+- Showed the PyTorch fitting loop is CPU-overhead-bound: ~190 kernel launches per Adam step, ~12 µs of CPU per launch vs ~2.4 µs of GPU per kernel, GPU busy ~7.5%. Showed its per-step syncs cost <1%, rejecting the original sync hypothesis.
+- Showed the JAX DE objective is memory-bound: XLA fuses it into 22 kernels moving ~430 MB per call (estimated from HLO). The largest kernel reaches 92.7% of DRAM bandwidth at 28% compute throughput, with measured bytes close to the model.
+- Found that JAX runs the DE loop as CUDA graphs, which is why it isn't launch-bound, and that the DE takes ~88% of GPU time but only ~37% of wall time.
+- Found additional costs: session setup (4.26 s, with a QR decomposition launched per vertex) and XLA autotuning in the first compile.
+
+**Cannot claim yet:** any speedup; per-framework memory use; a breakdown of session setup; `localize(full=True)` (offline mode, not profiled).
+
+---
+
+## Appendix: pitfalls found
+
+- Ubuntu's `nsight-systems` package lacks the `.qdstrm` importer. Use NVIDIA's packages.
+- PyTorch Profiler marker rows (zero CPU time) show GPU-timeline windows, not kernel time.
+- `nvtx_gpu_proj_sum` reports the span on the GPU timeline, not busy time.
+- `--cuda-graph-trace=node` is needed to see JAX's kernels, but it inflates kernel durations.
+- Profilers distort timing: use them for counts and proportions, and the harness for times.
+- `Self CPU time total` adds up time across threads (backward runs on its own thread), so it can exceed elapsed time.
+- Use medians: trial 1 skews means.
+- Redirecting output into tracked files marked the tree dirty; `collect_env` now ignores `benchmarks/results/`.
