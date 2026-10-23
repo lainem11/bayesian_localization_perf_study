@@ -2,7 +2,7 @@
 
 Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is next.
+**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is in progress.
 
 ## Setup
 
@@ -446,27 +446,43 @@ python run_session.py --repeats 3 --merged_adam --compile_loss --out results/202
 
 **Cannot claim:** a practical speedup of the experiment; any change to the DE or to `localize(full=True)`; statistical evidence about closed-loop localization accuracy (one trajectory per variant).
 
-### 3a.1 Vector add
+---
 
-**Hypothesis**
+# Phase 3: Triton kernels
 
-Eager PyTorch launches CUDA kernels which may be slower than customized Triton kernels. 
+Triton 3.7.0 (bundled with PyTorch 2.12.0). Timing uses `triton.testing.do_bench`, which overwrites a buffer larger than L2 before each repetition (`clear_cache`), so data is read from DRAM, and returns milliseconds. From 3a.1 on it is called with `return_mode="median"` (default: mean) or with `quantiles=[0.25, 0.5, 0.75]`.
 
-**Method**
+## 3a.1 Vector add
 
-Wrote script `triton_vector_add.py` to compare vector addition with a Triton kernel vs PyTorch. It sweeps through vector sizes and block sizes and records the times per kernel type.
+**Hypothesis.** A simple Triton kernel reaches near-peak DRAM bandwidth, matches PyTorch's `x + y`, and its throughput depends on block size.
 
+**Method.** `triton_vector_add.py`: each program loads a contiguous, masked block of `BLOCK_SIZE` elements of x and y and stores their sum. Bandwidth = 3 × n × 4 bytes (2 reads + 1 write, float32) / time. Every size is checked with `assert_close(…, rtol=0, atol=0)` (addition is correctly rounded, so any implementation gives the same bits); all passed. Commit `54100d6`, clean tree:
 ```
 python triton_vector_add.py > results/triton_vector_add_median_2026-10-23.txt
 ```
+Part 1 sweeps n = 2¹²…2²⁶ (BLOCK 1024, Triton vs PyTorch, medians). Part 2 sweeps BLOCK at n = 2²⁶ (quantiles). The GPU has 34 SMs with up to 1536 threads each (`torch.cuda.get_device_properties`; console output, not saved). Every program runs as 4 warps = 128 threads (`num_warps` column).
 
-**Vector size**
-With small vectors (< 100,000 elements) the speed is bound by a fixed cost, and memory throughput is small. The throughput creeps towards the maximum as the vector size increases. However, the PyTorch seems to achieve equivalent speed vs Triton in the vector addition.
+**Results, part 1** (selected rows):
 
-**Block size**
+| n | MB moved | Triton ms | Triton GB/s | PyTorch ms | PyTorch GB/s |
+|---:|---:|---:|---:|---:|---:|
+| 4096 | 0.05 | 0.0061 | 8.0 | 0.0061 | 8.0 |
+| 4194304 | 50.33 | 0.2150 | 234.1 | 0.2130 | 236.3 |
+| 67108864 | 805.31 | 3.2369 | 248.8 | 3.2379 | 248.7 |
 
-The optimal block size is 4096, and gives 4% gain over the default 1024. Every program is 4 warps = 128 threads. At 4096 block size, each thread handles 4096/128=32 elements. That's the size of the input vectors in the code.
+**Results, part 2** (n = 2²⁶, selected rows):
 
-**Conclusion**
+| BLOCK | programs | q25 ms | median ms | q75 ms | GB/s (median) |
+|---:|---:|---:|---:|---:|---:|
+| 128 | 524288 | 3.2860 | 3.3403 | 3.3833 | 241.1 |
+| 1024 | 65536 | 3.2287 | 3.2758 | 3.2922 | 245.8 |
+| 4096 | 16384 | 3.1229 | 3.1416 | 3.1611 | 256.3 |
+| 8192 | 8192 | 3.1283 | 3.1437 | 3.1688 | 256.2 |
+| 16384 | 4096 | 3.1642 | 3.1918 | 3.2164 | 252.3 |
 
-Small gain of around 4% can be had with a Triton kernel vs PyTorch when optimizing the block size. It may be that more complicated arithmetics show more differences.
+**Conclusion.**
+- **Small n is latency-bound.** n = 4096 and n = 16384 both take 0.0061 ms: a fixed cost of ~6 µs per kernel on the GPU dominates, and at n = 4096 the grid has only 4 programs for 34 SMs. Bandwidth exceeds 200 GB/s only from n = 4194304 (50 MB).
+- **Triton and PyTorch are equal at the same block size.** Both are one memory-bound kernel moving the same bytes; at 2²⁶ they differ by 0.0010 ms. An earlier run with means (`triton_vector_add_2026-10-23.txt`, commit `c36dc2b`) showed Triton ~1 µs faster at small n; with medians this didn't reproduce.
+- **Block size matters by ~4%.** BLOCK 4096 is 4.1% faster than 1024 ((3.2758 − 3.1416) / 3.2758), and the interquartile ranges don't overlap. 256.3 GB/s is 89% of the 288 GB/s spec and 92% of the ~280 GB/s peak derived from ncu's DRAM clock (1.5), about the same as XLA's `loop_add_log_fusion` (~259 GB/s). *Hypothesis, not measured:* larger blocks give each thread more independent loads in flight and reduce per-program fixed cost; 16384 may lose occupancy to register use.
+- Triton at BLOCK 4096 (3.1416 ms, part 2) vs PyTorch (3.2379 ms, part 1) is ~3% faster at 2²⁶, but the two come from different parts of one run, not alternated runs.
+- Implication for 3b: a simple kernel already streams memory near peak, as XLA's kernel does. The DE objective can only get faster by moving fewer bytes, i.e. by fusing so intermediates are never written to DRAM.
