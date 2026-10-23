@@ -40,17 +40,17 @@ if __name__ == "__main__":
         print(f"{n:>10} {3*n*4/1e6:>9.2f} {ms_triton:>10.4f} {gbps(n, ms_triton):>12.1f} "
               f"{ms_torch:>9.4f} {gbps(n, ms_torch):>11.1f}")
 
-        print("\nBlock-size sweep, n = 2**26")
-        n = 2 ** 26
-        x = torch.rand(n, device="cuda")
-        y = torch.rand(n, device="cuda")
-        print(f"{'BLOCK':>6} {'programs':>9} {'warps':>6} {'q25 ms':>8} {'median ms':>10} {'q75 ms':>8} {'GB/s (median)':>14}")
-        for bs in [128, 256, 512, 1024, 2048, 4096, 8192, 16384]:
-            out = torch.empty_like(x)
-            grid = (triton.cdiv(n, bs),)
-            k = add_kernel[grid](x, y, out, n, BLOCK_SIZE=bs)             # (1)
-            torch.testing.assert_close(out, x + y, rtol=0, atol=0)
-            q25, q50, q75 = triton.testing.do_bench(lambda: add(x, y, bs),
-                                                    quantiles=[0.25, 0.5, 0.75])  # (2)
-            print(f"{bs:>6} {grid[0]:>9} {k.metadata.num_warps:>6} {q25:>8.4f} {q50:>10.4f} "
-                f"{q75:>8.4f} {gbps(n, q50):>14.1f}")
+    print("\nBlock-size sweep, n = 2**26")
+    n = 2 ** 26
+    x = torch.rand(n, device="cuda")
+    y = torch.rand(n, device="cuda")
+    print(f"{'BLOCK':>6} {'programs':>9} {'warps':>6} {'q25 ms':>8} {'median ms':>10} {'q75 ms':>8} {'GB/s (median)':>14}")
+    for bs in [128, 256, 512, 1024, 2048, 4096, 8192, 16384]:
+        out = torch.empty_like(x)
+        grid = (triton.cdiv(n, bs),)
+        k = add_kernel[grid](x, y, out, n, BLOCK_SIZE=bs)             # (1)
+        torch.testing.assert_close(out, x + y, rtol=0, atol=0)
+        q25, q50, q75 = triton.testing.do_bench(lambda: add(x, y, bs),
+                                                quantiles=[0.25, 0.5, 0.75])  # (2)
+        print(f"{bs:>6} {grid[0]:>9} {k.metadata.num_warps:>6} {q25:>8.4f} {q50:>10.4f} "
+            f"{q75:>8.4f} {gbps(n, q50):>14.1f}")
