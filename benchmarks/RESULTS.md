@@ -486,3 +486,30 @@ Part 1 sweeps n = 2¹²…2²⁶ (BLOCK 1024, Triton vs PyTorch, medians). Part 
 - **Block size matters by ~4%.** BLOCK 4096 is 4.1% faster than 1024 ((3.2758 − 3.1416) / 3.2758), and the interquartile ranges don't overlap. 256.3 GB/s is 89% of the 288 GB/s spec and 92% of the ~280 GB/s peak derived from ncu's DRAM clock (1.5), about the same as XLA's `loop_add_log_fusion` (~259 GB/s). *Hypothesis, not measured:* larger blocks give each thread more independent loads in flight and reduce per-program fixed cost; 16384 may lose occupancy to register use.
 - Triton at BLOCK 4096 (3.1416 ms, part 2) vs PyTorch (3.2379 ms, part 1) is ~3% faster at 2²⁶, but the two come from different parts of one run, not alternated runs.
 - Implication for 3b: a simple kernel already streams memory near peak, as XLA's kernel does. The DE objective can only get faster by moving fewer bytes, i.e. by fusing so intermediates are never written to DRAM.
+
+## 3a.2 Fused elementwise op
+
+**Hypothesis.** Eager PyTorch runs each operation of a chain as its own kernel and writes every intermediate to DRAM. One Triton kernel that keeps the intermediates in registers should be faster roughly in proportion to the bytes removed, and `torch.compile` should match it.
+
+**Method.** `triton_fused_elementwise.py` computes log(clip(e / (e + exp(clip(−s(e − t), −16, 16))), 1e−6, 1 − 1e−6)), the response model of `src/ABL/model.py:425–427` without the Fourier terms, for n = 2²⁶ with inputs in the simulation's ranges (`src/ABL/core.py:304–306`). Variants: Triton kernel (BLOCK 4096), eager PyTorch, and `torch.compile` of the eager function (compiled before timing). `do_bench` with quantiles; effective GB/s counts only the minimum traffic, 16 bytes per element (3 reads + 1 write). Commit `e7d6f07`, clean tree:
+```
+python triton_fused_elementwise.py > results/triton_fused_elementwise_2026-10-23.txt
+```
+
+**Results** (n = 2²⁶, minimum traffic 1073.7 MB):
+
+| variant | q25 ms | median ms | q75 ms | eff. GB/s |
+|---|---:|---:|---:|---:|
+| Triton | 4.0724 | 4.1324 | 4.7301 | 259.8 |
+| eager | 24.3881 | 24.4500 | 24.7301 | 43.9 |
+| compiled | 4.0911 | 4.1487 | 4.5514 | 258.8 |
+
+Against eager, `assert_close` (default tolerances) passed for both. Bitwise-equal fraction: Triton 0.598, compiled 0.763; max abs diff 1.907e-06 and 9.537e-07.
+
+**Kernels and bytes.** PyTorch Profiler on one eager call shows 9 kernel launches (console output, not saved): 4 binary ops (`e − t`, `−s × …`, `e + exp(…)`, `e / …`; 8 bytes read + 4 written per element) and 5 unary ops (`−s`, 2 × `clamp`, `exp`, `log`; 4 + 4 bytes). That is 88 bytes per element, against 16 for the fused kernel.
+
+**Conclusion.**
+- **Fusion gives 5.9×** (24.4500 / 4.1324 ms). The bytes ratio is 88 / 16 = 5.5. Eager's implied bandwidth is 88 × 2²⁶ B / 24.45 ms = 241.5 GB/s, so eager is memory-bound at almost the same bandwidth. The speedup comes from moving fewer bytes, plus a little from Triton's higher bandwidth (259.8 vs 241.5 GB/s).
+- **`torch.compile` matches the hand-written kernel** (medians 4.1487 vs 4.1324 ms, overlapping IQRs). Inductor generates Triton kernels for the GPU; the generated code was not inspected here.
+- **Not bitwise identical, but within 1–2 ulp.** For values of magnitude 8–16 (log p goes down to log 1e−6 ≈ −13.8), one float32 ulp is 2⁻²⁰ = 9.537e-07. Compiled differs from eager by at most 1 ulp, Triton by at most 2 (1.907e-06 = 2⁻¹⁹). IEEE requires correct rounding for + − × ÷ (hence bitwise equality in 3a.1) but not for `exp` and `log`, whose implementations differ; a compiler may also contract multiply-add into a single FMA.
+- Triton's q75 is 15% above its median (eager's spread is tight). Not investigated.
