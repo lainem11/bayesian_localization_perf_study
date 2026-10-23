@@ -326,6 +326,7 @@ Wall-time shares: harness baseline (`2026-10-20_baseline_r3.json`). GPU-time sha
 - `Self CPU time total` adds up time across threads (backward runs on its own thread), so it can exceed elapsed time.
 - Use medians: trial 1 skews means.
 - Redirecting output into tracked files marked the tree dirty; `collect_env` now ignores `benchmarks/results/`.
+- Inputs that fit in L2 (32 MB) can give bimodal kernel timings and apparent bandwidths above the DRAM peak, even with `do_bench`'s cache clearing (3a.3). Measure DRAM bandwidth with inputs much larger than L2 and repeat runs.
 
 # Phase 2: Framework-level optimization
 
@@ -513,3 +514,56 @@ Against eager, `assert_close` (default tolerances) passed for both. Bitwise-equa
 - **`torch.compile` matches the hand-written kernel** (medians 4.1487 vs 4.1324 ms, overlapping IQRs). Inductor generates Triton kernels for the GPU; the generated code was not inspected here.
 - **Not bitwise identical, but within 1–2 ulp.** For values of magnitude 8–16 (log p goes down to log 1e−6 ≈ −13.8), one float32 ulp is 2⁻²⁰ = 9.537e-07. Compiled differs from eager by at most 1 ulp, Triton by at most 2 (1.907e-06 = 2⁻¹⁹). IEEE requires correct rounding for + − × ÷ (hence bitwise equality in 3a.1) but not for `exp` and `log`, whose implementations differ; a compiler may also contract multiply-add into a single FMA.
 - Triton's q75 is 15% above its median (eager's spread is tight). Not investigated.
+
+## 3a.3 Row-wise logsumexp
+
+**Hypothesis.** A single-pass (online) logsumexp is numerically stable and reads its input once, so it should be faster than eager `torch.logsumexp`. Each program handles one row in chunks, keeping a running max m and a running sum s that is rescaled by exp(m − m′) when the max rises to m′.
+
+**Method.** `triton_logsumexp.py`, inputs `randn × 5 − 20` (log-probability-like). Two shapes, both with 512 rows (one program per row):
+- [512 × 7444], the DE's candidates × vertices: 15.25 MB, fits in L2.
+- [512 × 59552]: 8× longer rows, 121.96 MB.
+
+Variants: eager `torch.logsumexp`, `torch.compile` of it, and Triton with BLOCK 256–4096. `do_bench` with quantiles. Stability check on x + 100 against a naive log(Σ exp(x)). Commit `62435da`, clean tree, 3 runs:
+```
+for i in 1 2 3; do python triton_logsumexp.py > results/triton_logsumexp_2026-10-23_run$i.txt; done
+```
+(An earlier single-shape run is in `triton_logsumexp_2026-10-23.txt`, commit `c9b2e01`.)
+
+**Stability.** Naive: non-finite. Triton: finite, max abs diff vs `torch.logsumexp` 7.629e-06 (1 ulp for values in [64, 128): 2⁻¹⁷).
+
+**Results, 121.96 MB** (median ms in runs 1 / 2 / 3):
+
+| variant | run 1 | run 2 | run 3 | GB/s (run 2) |
+|---|---:|---:|---:|---:|
+| torch eager | 2.9102 | 2.9133 | 2.9113 | 41.9 |
+| compiled | 0.5806 | 0.5816 | 0.5796 | 209.7 |
+| Triton 256 | 0.5857 | 0.5929 | 0.5908 | 205.7 |
+| Triton 512 | 0.5356 | 0.5499 | 0.5499 | 221.8 |
+| Triton 1024 | 0.5233 | 0.5448 | 0.5453 | 223.9 |
+| Triton 4096 | 0.5437 | 0.5427 | 0.5427 | 224.7 |
+
+**Results, 15.25 MB** (median ms):
+
+| variant | `c9b2e01` run | run 1 | run 2 | run 3 |
+|---|---:|---:|---:|---:|
+| compiled | 0.0840 | 0.0840 | 0.0850 | 0.0850 |
+| Triton 512 | 0.0522 | 0.0860 | 0.0532 | 0.0543 |
+| Triton 1024 | 0.0543 | 0.0840 | 0.0850 | 0.0543 |
+| Triton 4096 | 0.0553 | 0.0840 | 0.0840 | 0.0840 |
+
+**Conclusion.**
+- **The online logsumexp is stable**, where the naive version overflows.
+- **At 122 MB the results reproduce across runs.** Triton with BLOCK 1024–4096 takes ≈0.543 ms (≈224 GB/s), 5.4× faster than eager (2.9113 / 0.5427, run 3) and ≈6% faster than `torch.compile` (0.5806 / 0.5448). No variant exceeds the DRAM peak. Eager `torch.logsumexp` probably runs as several kernels with full-size intermediates (not profiled).
+- **≈224 GB/s is below the ≈260 GB/s of the elementwise kernels.** *Hypotheses, not tested:* with 512 programs and ~408 resident at once, the second wave leaves most SMs idle (tail effect); each program also loops over its row serially.
+- **At 15 MB the Triton timings are bimodal**: either ≈0.053 ms or ≈0.084 ms, switching between block sizes and runs (in run 1, Triton 256 has q25 0.0563 and median 0.0932). The fast mode implies up to 292 GB/s, above the DRAM peak, so part of the input is served from L2 despite `do_bench`'s cache clearing. Compiled always measures ≈0.084 ms. Cause not investigated, so the 15 MB numbers are not used as bandwidth figures.
+
+## Phase 3a summary
+
+**Can claim:**
+- Wrote three Triton kernels (vector add, a fused elementwise chain of ABL's response model, an online row-wise logsumexp), each checked against PyTorch: bitwise for addition, within 1–2 ulp for chains with `exp`/`log`.
+- Vector add reaches 256.3 GB/s (89% of the 288 GB/s spec) after a block-size sweep (+4.1% over BLOCK 1024), equal to PyTorch at the same block size. The PTX shows 16-byte vector loads.
+- Fusing a 9-kernel eager chain into one kernel: 5.9× faster, explained by bytes moved (88 → 16 bytes per element) at similar bandwidth. `torch.compile` matched the hand-written kernel.
+- The online logsumexp is numerically stable, 5.4× faster than eager and ≈6% faster than `torch.compile` at 122 MB.
+- Found that benchmarks whose input fits in L2 give bimodal timings and apparent bandwidths above the DRAM peak.
+
+**Cannot claim yet:** any change to the DE objective; register or occupancy analysis of the kernels (not measured); the cause of the bimodal timings; byte counts of the Triton kernels verified with ncu.
