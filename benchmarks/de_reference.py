@@ -59,10 +59,9 @@ def compare(name, ref, new):
           f"argmin equal: {ref.argmin().item() == new.argmin().item()} ({ref.argmin().item()} vs {new.argmin().item()})")
 
 
-if __name__ == "__main__":
-    for key, value in collect_env().items():
-        print(f"{key}: {value}")
-
+def fixed_state():
+    """Session after 3 trials (as in profile_de.py), a fixed constrained population, and the
+    objective inputs as JAX arrays (pop_j, lsp_j, params_j) and PyTorch tensors (pop_t, lsp_t, p_t, c)."""
     S = make_session()
     for _ in range(3):                          # same state as profile_de.py: 3 trials
         S.start_trial(); d = S.choose_next_stimulus(); S.record_efield_trial(d)
@@ -74,17 +73,6 @@ if __name__ == "__main__":
     params_j = tuple(jnp.asarray(rm.param_dict[k]['values'].detach().cpu().numpy().astype(np.float32)) for k in opt.param_keys)
     pop_j = jax.random.uniform(jax.random.key(0), (512, opt.n_coils), minval=-1.0, maxval=1.0)
     pop_j = opt.jitted_constraint_func(pop_j)   # scale to the strain limit, like the DE's initial population
-
-    # JAX: the session's objective, and one without penalties (expected change only)
-    fit_j = opt.jitted_objective(pop_j, lsp_j, params_j)
-    to_j = lambda t: jnp.asarray(t.detach().cpu().numpy().astype(np.float32))
-    change_only_j = _create_objective_function(
-        efield_basis_jax=to_j(em.efield_basis), null_dir_basis_jax=to_j(em.null_dir_basis.squeeze()),
-        prob_lim_jax=jnp.asarray(rm.prob_lim, dtype=jnp.float32), efield_set_jax=to_j(em.efield_set),
-        max_current_slope_jax=to_j(opt.max_current_slope.flatten()), efield_limit=1e30,
-        strain_func_jax=None, strain_limit=None, constraint_penalty=opt.optimizer_settings['constraint_penalty'],
-        param_keys=opt.param_keys)
-    obj_j = change_only_j(pop_j, lsp_j, params_j)
 
     # PyTorch: same inputs
     dev = "cuda"
@@ -98,10 +86,33 @@ if __name__ == "__main__":
         "strain_limit": opt.strain_limit, "efield_limit": float(opt.efield_limit),
     }
     p_t = {k: to_t(v) for k, v in zip(opt.param_keys, params_j)}
-    fit_t, obj_t = objective_torch(to_t(pop_j), to_t(lsp_j), p_t, c)
+    return dict(S=S, opt=opt, rm=rm, em=em, pop_j=pop_j, lsp_j=lsp_j, params_j=params_j,
+                pop_t=to_t(pop_j), lsp_t=to_t(lsp_j), p_t=p_t, c=c, to_t=to_t)
+
+
+if __name__ == "__main__":
+    for key, value in collect_env().items():
+        print(f"{key}: {value}")
+
+    st = fixed_state()
+    S, opt, rm, em, to_t = st["S"], st["opt"], st["rm"], st["em"], st["to_t"]
+    pop_j, lsp_j, params_j = st["pop_j"], st["lsp_j"], st["params_j"]
+
+    # JAX: the session's objective, and one without penalties (expected change only)
+    fit_j = opt.jitted_objective(pop_j, lsp_j, params_j)
+    to_j = lambda t: jnp.asarray(t.detach().cpu().numpy().astype(np.float32))
+    change_only_j = _create_objective_function(
+        efield_basis_jax=to_j(em.efield_basis), null_dir_basis_jax=to_j(em.null_dir_basis.squeeze()),
+        prob_lim_jax=jnp.asarray(rm.prob_lim, dtype=jnp.float32), efield_set_jax=to_j(em.efield_set),
+        max_current_slope_jax=to_j(opt.max_current_slope.flatten()), efield_limit=1e30,
+        strain_func_jax=None, strain_limit=None, constraint_penalty=opt.optimizer_settings['constraint_penalty'],
+        param_keys=opt.param_keys)
+    obj_j = change_only_j(pop_j, lsp_j, params_j)
+
+    fit_t, obj_t = objective_torch(st["pop_t"], st["lsp_t"], st["p_t"], st["c"])
 
     print(f"\npopulation 512 x {opt.n_coils}, vertices {lsp_j.shape[0]}")
-    print(f"candidates with strain penalty > 0 (torch): {(strain_torch(to_t(pop_j)) > c['strain_limit'] + 1e-6).sum().item()}")
+    print(f"candidates with strain penalty > 0 (torch): {(strain_torch(st['pop_t']) > st['c']['strain_limit'] + 1e-6).sum().item()}")
     compare("expected-change objective (no penalties)", to_t(obj_j), obj_t)
     compare("full fitness (with penalties)", to_t(fit_j), fit_t)
     S.end_session()
