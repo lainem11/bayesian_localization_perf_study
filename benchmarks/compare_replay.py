@@ -12,7 +12,7 @@ pa, pb = np.exp(la), np.exp(lb)
 
 for i in range(19, 50):                            # trials 20..50
     order = np.argsort(pa[i])[::-1]                # vertices from most to least probable
-    k = np.searchsorted(np.cumsum(pa[i][order]), 0.95) + 1   # how many hold 99% of the mass
+    k = np.searchsorted(np.cumsum(pa[i][order]), 0.95) + 1   # how many hold 95% of the mass
     top = order[:k]
     rel = np.abs(pb[i][top] - pa[i][top]) / pa[i][top]
     print(f"trial {i+1}: {k} vertices, max relative difference {rel.max():.2%}")
