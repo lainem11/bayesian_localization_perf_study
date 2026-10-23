@@ -2,7 +2,7 @@
 
 Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-**Status:** Phase 0 (baseline) and Phase 1 (profiling) are complete. Phase 2 (framework-level optimization) is next.
+**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is next.
 
 ## Setup
 
