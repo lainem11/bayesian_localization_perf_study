@@ -1,0 +1,23 @@
+GIT branch: perf-study
+GIT commit: 37670643e2ce84ff4ae687e677fada09b8974523
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+
+population 512 x 5, vertices 7444
+candidates with strain penalty > 0 (torch): 0
+expected-change objective (no penalties): ref range [-1.167489e-04, -1.452206e-06], max abs diff 1.641e-09, max rel diff 1.133e-04, argmin equal: True (237 vs 237)
+full fitness (with penalties): ref range [-1.167489e-04, 1.527618e+06], max abs diff 7.500e-01, max rel diff 3.344e-05, argmin equal: True (237 vs 237)
