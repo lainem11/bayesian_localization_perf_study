@@ -15,6 +15,7 @@ Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Loca
 | PyTorch | 2.12.0+cu126 (built with CUDA 12.6) |
 | JAX / jaxlib / jax-cuda12-plugin | 0.7.2 / 0.7.2 / 0.7.2 |
 | evosax / numpyro | 0.2.0 / 0.20.1 |
+|Triton | 3.7.0 |
 | Profilers | PyTorch Profiler; Nsight Systems CLI 2026.5.1 and Nsight Compute, both installed from NVIDIA's packages inside WSL |
 
 **Limitations.** WSL2 adds overhead to every kernel launch and synchronization compared with native Linux, and the GPU also drives the display. Small-kernel timings are therefore somewhat pessimistic.
@@ -444,3 +445,28 @@ python run_session.py --repeats 3 --merged_adam --compile_loss --out results/202
 - Built a two-level equivalence check (bitwise trajectory; per-trial posterior comparison on replayed data).
 
 **Cannot claim:** a practical speedup of the experiment; any change to the DE or to `localize(full=True)`; statistical evidence about closed-loop localization accuracy (one trajectory per variant).
+
+### 3a.1 Vector add
+
+**Hypothesis**
+
+Eager PyTorch launches CUDA kernels which may be slower than customized Triton kernels. 
+
+**Method**
+
+Wrote script `triton_vector_add.py` to compare vector addition with a Triton kernel vs PyTorch. It sweeps through vector sizes and block sizes and records the times per kernel type.
+
+```
+python triton_vector_add.py > results/triton_vector_add_median_2026-10-23.txt
+```
+
+**Vector size**
+With small vectors (< 100,000 elements) the speed is bound by a fixed cost, and memory throughput is small. The throughput creeps towards the maximum as the vector size increases. However, the PyTorch seems to achieve equivalent speed vs Triton in the vector addition.
+
+**Block size**
+
+The optimal block size is 4096, and gives 4% gain over the default 1024. Every program is 4 warps = 128 threads. At 4096 block size, each thread handles 4096/128=32 elements. That's the size of the input vectors in the code.
+
+**Conclusion**
+
+Small gain of around 4% can be had with a Triton kernel vs PyTorch when optimizing the block size. It may be that more complicated arithmetics show more differences.
