@@ -390,3 +390,38 @@ python profile_localize.py --merged_adam > results/profile_localize_b1_merged.tx
 | Self CUDA time total | 189.7 ms | 161.4 ms |
 
 **Conclusion.** Launches dropped by exactly 7 ops × 5 × 450 = 15,750: each foreach op now launches once per step instead of 6 times. Launch CPU time explains only 0.173 s (37%) of the 0.469 s drop in `localize` CPU time; the rest is other CPU time, not yet broken down. The biggest remaining op is `aten::mul` (24,345 calls ≈ 54 per step, forward and backward of the loss), a candidate for fusion with `torch.compile`.
+
+## 2.3 Using torch.compile()
+
+Eager PyTroch runs each operation the moment it's reached, so there's one kernel for one intermediate tensor. I defined a new compiled loss function in `compiled_loss.py`, which does a lazy call to `torch.compile` when the loss function is called.
+
+Because the compilation changes the order of operation, rounding breaks the bitwise equivalence. Thus, I defined a new metric to measure equivalence: the maximum relative vertex-wise error must be below 5% in the 95% condifence region of the probability distribution, from trial 20 onwards. Early trials are expect to have a lot of variability as due to the low amount of data, the model overfits. To test equivalence across runs I wrote `compare_replay.py` called like:
+```
+python compare_replay.py REP1.npz REP2.npz
+```
+
+To compare runs I used:
+```
+export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
+REF=results/2026-10-22_baseline_pinned_r3.json
+python replay_localize.py $REF results/2026-10-22_replay_base.npz
+python replay_localize.py $REF results/2026-10-22_replay_merged.npz --merged_adam
+python replay_localize.py $REF results/2026-10-22_replay_compiled.npz --merged_adam --compile_loss
+python compare_replay.py results/2026-10-22_replay_base.npz results/2026-10-22_replay_merged.npz
+python compare_replay.py results/2026-10-22_replay_merged.npz results/2026-10-22_replay_compiled.npz
+```
+The equivalence held, as at trial the error was 4.5%, and from trial 21 onwards < 1%. So, equivalence holds.
+
+I then compared the execution times between the merged Adam in Section 2.2 and the compiled loss:
+
+```
+export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
+python run_session.py --repeats 3 --merged_adam --out results/2026-10-23_b2_merged1.json
+python run_session.py --repeats 3 --merged_adam --compile_loss --out results/2026-10-23_b2_compiled1.json
+python run_session.py --repeats 3 --merged_adam --out results/2026-10-23_b2_merged2.json
+python run_session.py --repeats 3 --merged_adam --compile_loss --out results/2026-10-23_b2_compiled2.json
+```
+
+The time of localize() reduced by 0.313 s per trial, which is a 3.3 x speedup. The first two trials take 3.79 and 6.19 s, which, compared to the merged Adam run is 8.6 s of extra time. There's two trials with compilation as PyTorch sees the tensor shape change on trial two, re-compiles, and marks the tensor as dynamic so future trials don't recompile. Repeated sessions have very little compile cost; PyTorch probably uses cached compilation results.
+
+The maximum probability vertex differed between the merged Adam and compile version at the final trial 50. However, they were neighbouring mesh vertices, so the difference in practice is small.
