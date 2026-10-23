@@ -35,22 +35,23 @@ if __name__ == "__main__":
     print(f"Triton version: {triton.__version__}\n")
 
     rows, cols = 512, 7444                         # DE shape: candidates x vertices
-    x = torch.randn(rows, cols, device="cuda") * 5 - 20   # log-probability-like values
+    for rows, cols in [(512, 7444), (512, 8 * 7444)]:      # 15 MB (fits in L2), 122 MB (doesn't)
+        x = torch.randn(rows, cols, device="cuda") * 5 - 20
+        ref = torch.logsumexp(x, dim=1)
+        torch.testing.assert_close(lse_triton(x), ref)
+        if cols == 7444:
+            print(f"Stability (x + 100): naive finite = {torch.isfinite(lse_naive(x + 100)).all().item()}, "
+                    f"triton finite = {torch.isfinite(lse_triton(x + 100)).all().item()}, "
+                    f"max abs diff vs torch = {(lse_triton(x + 100) - torch.logsumexp(x + 100, 1)).abs().max().item():.3e}")
 
-    ref = torch.logsumexp(x, dim=1)
-    torch.testing.assert_close(lse_triton(x), ref)
-    print(f"Stability (x + 100): naive finite = {torch.isfinite(lse_naive(x + 100)).all().item()}, "
-          f"triton finite = {torch.isfinite(lse_triton(x + 100)).all().item()}, "
-          f"max abs diff vs torch = {(lse_triton(x + 100) - torch.logsumexp(x + 100, 1)).abs().max().item():.3e}")
+        compiled = torch.compile(lambda x: torch.logsumexp(x, dim=1))
+        torch.testing.assert_close(compiled(x), ref)
 
-    compiled = torch.compile(lambda x: torch.logsumexp(x, dim=1))
-    torch.testing.assert_close(compiled(x), ref)
-
-    variants = {"torch eager": lambda: torch.logsumexp(x, dim=1), "compiled": lambda: compiled(x)}
-    for b in [256, 512, 1024, 2048, 4096]:
-        variants[f"triton {b}"] = (lambda b=b: lse_triton(x, b))
-    print(f"\nrows {rows}, cols {cols}, minimum traffic {(rows * cols + rows) * 4 / 1e6:.2f} MB")
-    print(f"{'variant':>12} {'q25 ms':>8} {'median ms':>10} {'q75 ms':>8} {'eff. GB/s':>10}")
-    for name, fn in variants.items():
-        q25, q50, q75 = triton.testing.do_bench(fn, quantiles=[0.25, 0.5, 0.75])
-        print(f"{name:>12} {q25:>8.4f} {q50:>10.4f} {q75:>8.4f} {gbps(rows, cols, q50):>10.1f}")
+        variants = {"torch eager": lambda: torch.logsumexp(x, dim=1), "compiled": lambda: compiled(x)}
+        for b in [256, 512, 1024, 2048, 4096]:
+            variants[f"triton {b}"] = (lambda b=b: lse_triton(x, b))
+        print(f"\nrows {rows}, cols {cols}, minimum traffic {(rows * cols + rows) * 4 / 1e6:.2f} MB")
+        print(f"{'variant':>12} {'q25 ms':>8} {'median ms':>10} {'q75 ms':>8} {'eff. GB/s':>10}")
+        for name, fn in variants.items():
+            q25, q50, q75 = triton.testing.do_bench(fn, quantiles=[0.25, 0.5, 0.75])
+            print(f"{name:>12} {q25:>8.4f} {q50:>10.4f} {q75:>8.4f} {gbps(rows, cols, q50):>10.1f}")
