@@ -391,16 +391,13 @@ python profile_localize.py --merged_adam > results/profile_localize_b1_merged.tx
 
 **Conclusion.** Launches dropped by exactly 7 ops × 5 × 450 = 15,750: each foreach op now launches once per step instead of 6 times. Launch CPU time explains only 0.173 s (37%) of the 0.469 s drop in `localize` CPU time; the rest is other CPU time, not yet broken down. The biggest remaining op is `aten::mul` (24,345 calls ≈ 54 per step, forward and backward of the loss), a candidate for fusion with `torch.compile`.
 
-## 2.3 Using torch.compile()
+## 2.3 Step (b2): `torch.compile` of the loss
 
-Eager PyTroch runs each operation the moment it's reached, so there's one kernel for one intermediate tensor. I defined a new compiled loss function in `compiled_loss.py`, which does a lazy call to `torch.compile` when the loss function is called.
+**Hypothesis.** Eager PyTorch runs each operation as soon as Python reaches it: one kernel and one intermediate tensor per operation (≈54 `aten::mul` per Adam step, 2.2). Compiling the loss (forward and backward) with `torch.compile` (Inductor backend) should fuse these into a few kernels and cut launches.
 
-Because the compilation changes the order of operation, rounding breaks the bitwise equivalence. Thus, I defined a new metric to measure equivalence: the maximum relative vertex-wise error must be below 5% in the 95% condifence region of the probability distribution, from trial 20 onwards. Early trials are expect to have a lot of variability as due to the low amount of data, the model overfits. To test equivalence across runs I wrote `compare_replay.py` called like:
-```
-python compare_replay.py REP1.npz REP2.npz
-```
+**Method.** `compiled_loss.py` keeps the original fitting loop (including `loss.item()` and the convergence check) and runs only the loss through `torch.compile`. It is stacked on merged Adam, so the comparison is merged vs merged + compile. Fusion changes the order of floating-point operations, so the trajectory is no longer bitwise identical and `compare.py` no longer applies.
 
-To compare runs I used:
+**Equivalence (level 2).** `replay_localize.py` feeds the `didt` values and responses of run 0 of a reference file into a fresh session and calls only `localize()`, so every variant fits the same 50 trials; it saves the log-posterior after each trial. `compare_replay.py` compares two such files. Criterion, set before the comparison: from trial 20 on, the maximum relative difference in posterior probability over the vertices holding 95% of the reference mass must be below 5% (earlier trials have too little data and the fit varies a lot).
 ```
 export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
 REF=results/2026-10-22_baseline_pinned_r3.json
@@ -410,18 +407,40 @@ python replay_localize.py $REF results/2026-10-22_replay_compiled.npz --merged_a
 python compare_replay.py results/2026-10-22_replay_base.npz results/2026-10-22_replay_merged.npz
 python compare_replay.py results/2026-10-22_replay_merged.npz results/2026-10-22_replay_compiled.npz
 ```
-The equivalence held, as at trial the error was 4.5%, and from trial 21 onwards < 1%. So, equivalence holds.
+- Base vs merged: zero difference in every trial (checks the tool).
+- Merged vs compiled: max relative difference 4.5% at trial 20 and below 1% from trial 21 on. **Passes.** Total variation distance ≤ 8.65e-4 in every trial (at most 0.09% of the posterior mass moved); argmax equal in 50/50 trials; Adam step counts differ in 3 trials (the convergence threshold reacts to rounding).
 
-I then compared the execution times between the merged Adam in Section 2.2 and the compiled loss:
-
+**Timing** (commit `2801e83`, clean tree, alternating A B A B):
 ```
-export XLA_FLAGS=--xla_gpu_load_autotune_results_from=$PWD/autotune/rtx4060ti.textproto
 python run_session.py --repeats 3 --merged_adam --out results/2026-10-23_b2_merged1.json
 python run_session.py --repeats 3 --merged_adam --compile_loss --out results/2026-10-23_b2_compiled1.json
-python run_session.py --repeats 3 --merged_adam --out results/2026-10-23_b2_merged2.json
-python run_session.py --repeats 3 --merged_adam --compile_loss --out results/2026-10-23_b2_compiled2.json
+(same again as b2_merged2, b2_compiled2)
 ```
+`localize` median (IQR) over 147 trials per file:
 
-The time of localize() reduced by 0.313 s per trial, which is a 3.3 x speedup. The first two trials take 3.79 and 6.19 s, which, compared to the merged Adam run is 8.6 s of extra time. There's two trials with compilation as PyTorch sees the tensor shape change on trial two, re-compiles, and marks the tensor as dynamic so future trials don't recompile. Repeated sessions have very little compile cost; PyTorch probably uses cached compilation results.
+| merged1 | compiled1 | merged2 | compiled2 |
+|---:|---:|---:|---:|
+| 0.4480 (0.0098) | 0.1354 (0.0038) | 0.4482 (0.0112) | 0.1353 (0.0047) |
 
-The maximum probability vertex differed between the merged Adam and compile version at the final trial 50. However, they were neighbouring mesh vertices, so the difference in practice is small.
+`localize` is 0.313 s (3.3×) faster per trial.
+
+**Compile cost.** A smoke test (`2026-10-22_b2_smoke.json`, `TORCH_LOGS=recompiles`) showed one recompile at trial 2 (`tensor 'e_mag' size mismatch at index 0`); after that the trial dimension is treated as dynamic and no further compiles occur. In `compiled1` run 0, trials 1–2 took 3.79 s and 6.19 s, ≈8.6 s more than in `merged1`, earned back after ~27 trials. Later sessions in the same process didn't compile again. In a new process (`compiled2` run 0), trials 1–2 took 1.02 s and 0.37 s, probably thanks to Inductor's on-disk cache (not verified).
+
+**Closed loop.** The compiled sessions follow a different trajectory and end at vertex 2512 instead of 2679 at trial 50. The two are neighbouring vertices on the mesh (checked by hand), so the difference is acceptable in practice. This is one trajectory per variant, not a statistical comparison.
+
+**Conclusion.** Compiling the loss gives the largest gain so far (3.3× per `localize`) at an acceptable numerical difference, but costs ~10 s of compile time in trials 1–2 of a fresh process.
+
+## Phase 2 summary
+
+**Practical relevance.** In a real experiment, the trial rate is limited by the few seconds required between stimuli, and the per-trial computation already fits within that. A faster online loop therefore brings little practical benefit, while a ~10 s compile stall in trial 2 is a real cost. The practical fix would be to compile during session setup (dynamic trial dimension from the start, one call on dummy data). The offline `localize(full=True)` (~5 min, NumPyro NUTS) would be the target with practical value.
+
+**Not done:** reducing the DE's memory traffic, compiling at setup, per-framework memory statistics, profiling `localize(full=True)`.
+
+**Can claim:**
+- Found that XLA's GEMM autotuner chose different kernels in different processes, which changed the trajectory, and pinned its choices with persisted autotuning, restoring a bitwise-reproducible baseline.
+- Showed the per-step `loss.item()` sync costs only 1–2% of `localize`, using a bitwise-identical fixed-step replay.
+- Merged Adam's 6 parameter groups into one foreach update: `localize` −18%, bitwise-identical trajectory, kernel launches reduced by 15,750 per 450 steps, exactly 7 foreach ops × 5 launches removed per step.
+- Compiled the loss with `torch.compile`: `localize` 0.448 → 0.135 s per trial, equivalent under a criterion fixed in advance on replayed data, with ~10 s first-time compile cost.
+- Built a two-level equivalence check (bitwise trajectory; per-trial posterior comparison on replayed data).
+
+**Cannot claim:** a practical speedup of the experiment; any change to the DE or to `localize(full=True)`; statistical evidence about closed-loop localization accuracy (one trajectory per variant).
