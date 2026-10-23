@@ -567,3 +567,29 @@ for i in 1 2 3; do python triton_logsumexp.py > results/triton_logsumexp_2026-10
 - Found that benchmarks whose input fits in L2 give bimodal timings and apparent bandwidths above the DRAM peak.
 
 **Cannot claim yet:** any change to the DE objective; register or occupancy analysis of the kernels (not measured); the cause of the bimodal timings; byte counts of the Triton kernels verified with ncu.
+
+---
+
+## 3b.1 PyTorch reference of the DE objective
+
+**Goal.** A readable PyTorch version of `single_objective_fun` (`src/ABL/optimizer.py:130–158`), vectorized over the population, to serve as the test oracle and eager baseline for a fused Triton kernel.
+
+**Method.** `de_reference.py` builds the same state as `profile_de.py` (a session after 3 trials) and a fixed population of 512 (`jax.random.uniform`, key 0, then the DE's own strain-constraint function, as for the DE's initial population). `objective_torch` ports the JAX code line by line, shapes [P, V, 3] → [P, V] → [P], including the strain function. It is compared against:
+- **the full fitness**: the session's jitted objective;
+- **the expected change alone**: a second JAX objective built with `src`'s `_create_objective_function` with both penalties switched off (strain function `None`, E-field limit 1e30). Penalties of order 1 or more would otherwise hide differences in an objective of order 1e-5.
+
+Pass criterion, set before running: max relative difference of the expected-change objective < 1e-3, and the same best candidate (argmin of the fitness). Commit `3767064`, clean tree:
+```
+python de_reference.py > results/de_reference_2026-10-23.txt
+```
+
+**Results.**
+
+| quantity | JAX range | max abs diff | max rel diff | argmin JAX / PyTorch |
+|---|---|---:|---:|---|
+| expected-change objective | −1.167489e-04 … −1.452206e-06 | 1.641e-09 | 1.133e-04 | 237 / 237 |
+| full fitness | −1.167489e-04 … 1.527618e+06 | 7.500e-01 | 3.344e-05 | 237 / 237 |
+
+No candidate has a strain penalty after the constraint function (0 of 512).
+
+**Conclusion.** **Passes** (1.1e-4 < 1e-3; same argmin). The expected change is small because it is a mean over 7444 vertices of changes in a posterior that sums to 1. The constraint function rescales violating candidates analytically onto the strain limit, so none is penalized. The largest fitness values (up to 1.5e6) come from the E-field penalty on candidates whose maximum E-field exceeds 200 V/m. The relative differences (~1e-4) are much larger than float32's 1.2e-7: probably cancellation in |p − p′| between nearly equal probabilities, plus different summation orders in the logsumexps (not investigated).
