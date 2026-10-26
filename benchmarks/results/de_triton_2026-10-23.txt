@@ -1,0 +1,38 @@
+GIT branch: perf-study
+GIT commit: f94bbe89e2d2f21d90de25c87f49962ddc9616aa
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: None
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+Triton version: 3.7.0
+
+Default config (BLOCK_P 4, BLOCK_V 128, 4 warps)
+expected change, Triton vs torch reference: ref range [-1.161928e-04, -1.388027e-06], max abs diff 3.181e-10, max rel diff 1.159e-04, argmin equal: True (237 vs 237)
+full fitness, Triton vs torch reference: ref range [-1.161928e-04, 1.527618e+06], max abs diff 7.500e-01, max rel diff 1.067e-05, argmin equal: True (237 vs 237)
+full fitness, Triton vs JAX: ref range [-1.161885e-04, 1.529034e+06], max abs diff 1.620e+03, max rel diff 4.532e+02, argmin equal: True (237 vs 237)
+
+ms per call, 200 calls back to back, 7 repeats
+               variant  programs      q25   median      q75  max rel diff
+      XLA (JAX), start              1.531    1.534    1.538
+     Triton P1 V512 w4       512    1.003    1.012    1.017     1.158e-04
+    Triton P1 V1024 w4       512    1.009    1.021    1.039     1.159e-04
+     Triton P2 V256 w4       256    0.760    0.763    0.765     6.487e-05
+     Triton P2 V512 w4       256    0.613    0.617    0.618     1.158e-04
+     Triton P4 V128 w4       128    0.526    0.526    0.536     1.159e-04
+     Triton P4 V256 w4       128    0.543    0.547    0.549     6.487e-05
+      Triton P8 V64 w4        64    0.523    0.535    0.538     9.709e-05
+     Triton P8 V128 w4        64    0.524    0.525    0.530     1.159e-04
+     Triton P16 V64 w4        32    0.530    0.533    0.535     9.709e-05
+        XLA (JAX), end              1.530    1.530    1.534
