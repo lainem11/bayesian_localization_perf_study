@@ -1,0 +1,48 @@
+GIT branch: perf-study
+GIT commit: 8630c9cbf786027f145d66079a7a7224b8017ec5
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+Triton version: 3.7.0
+
+wrote results/de_state_2026-10-26.npz: 0.93 MB
+scalars: {'lo': 9.999999974752427e-07, 'hi': 0.9999989867210388, 'penalty': 100.0, 'strain_limit': 0.64000004529953, 'efield_limit': 200.0} (types {'lo': 'float', 'hi': 'float', 'penalty': 'float', 'strain_limit': 'float', 'efield_limit': 'float'})
+  pop              (512, 5)       float32
+  lsp              (7444,)        float32
+  efield_norm      (5, 7444, 3)   float32
+  basis            (7444, 3, 2)   float32
+  null_dir         (7444, 2)      float32
+  p_rf_fourier1    (7444,)        float32
+  p_rf_fourier2    (7444,)        float32
+  p_rf_fourier3    (7444,)        float32
+  p_rf_fourier4    (7444,)        float32
+  p_rf_slope       (7444,)        float32
+  p_rf_translate   (7444,)        float32
+  out_fit_jax      (512,)         float32
+  out_obj_jax      (512,)         float32
+  out_fit_torch    (512,)         float32
+  out_obj_torch    (512,)         float32
+  out_fit_triton   (512,)         float32
+  out_obj_triton   (512,)         float32
+
+expected change, torch vs JAX: ref range [-1.167489e-04, -1.452206e-06], max abs diff 1.641e-09, max rel diff 1.133e-04, argmin equal: True (237 vs 237)
+full fitness, torch vs JAX: ref range [-1.167489e-04, 1.527618e+06], max abs diff 7.500e-01, max rel diff 3.344e-05, argmin equal: True (237 vs 237)
+expected change, Triton vs torch: ref range [-1.167492e-04, -1.452208e-06], max abs diff 3.229e-10, max rel diff 4.824e-05, argmin equal: True (237 vs 237)
+
+round trip (reloaded state, recomputed here), bitwise equal to live state:
+  torch  fitness True, expected change True
+  triton fitness True, expected change True
+  saved jax outputs equal live: True

@@ -1,0 +1,39 @@
+GIT branch: perf-study
+GIT commit: 8630c9cbf786027f145d66079a7a7224b8017ec5
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+Triton version: 3.7.0
+
+Default config (BLOCK_P 4, BLOCK_V 128, 4 warps)
+expected change, Triton vs torch reference: ref range [-1.167492e-04, -1.452208e-06], max abs diff 3.229e-10, max rel diff 4.824e-05, argmin equal: True (237 vs 237)
+full fitness, Triton vs torch reference: ref range [-1.167492e-04, 1.527618e+06], max abs diff 7.500e-01, max rel diff 1.957e-05, argmin equal: True (237 vs 237)
+full fitness, Triton vs JAX: ref range [-1.167489e-04, 1.527618e+06], max abs diff 1.500e+00, max rel diff 3.218e-05, argmin equal: True (237 vs 237)
+
+ms per call, 200 calls back to back, 7 repeats
+                       variant  programs      q25   median      q75  max rel diff
+              XLA (JAX), start              1.532    1.534    1.535
+             Triton P1 V512 w4       512    0.808    0.808    0.808     1.768e-04
+            Triton P1 V1024 w4       512    0.814    0.814    0.815     1.767e-04
+             Triton P2 V256 w4       256    0.584    0.586    0.586     1.767e-04
+             Triton P2 V512 w4       256    0.438    0.438    0.438     1.768e-04
+             Triton P4 V128 w4       128    0.273    0.274    0.274     4.824e-05
+             Triton P4 V256 w4       128    0.363    0.363    0.363     1.767e-04
+              Triton P8 V64 w4        64    0.317    0.317    0.317     6.503e-05
+             Triton P8 V128 w4        64    0.246    0.247    0.247     4.824e-05
+             Triton P16 V64 w4        32    0.353    0.353    0.353     6.503e-05
+  Triton P4 V128, eager strain       128    0.544    0.549    0.553
+                XLA (JAX), end              1.532    1.534    1.535
