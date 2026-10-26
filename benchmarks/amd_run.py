@@ -8,6 +8,7 @@
 #   python amd_run.py --state ... --quick                      # small sizes, short sweep (smoke test)
 #   python amd_run.py --state ... --only de                    # sections: vector_add,elementwise,lse,de
 #   python amd_run.py --state ... --profile 8 128 4            # 3 DE kernel calls only, for a profiler
+#   python amd_run.py --state ... --profile-add 28 4096        # 3 vector-add calls at n = 2^28, for a profiler
 #   python amd_run.py --state ... --only de --save-outputs results/de_outputs_<gpu>.npz
 import argparse
 import itertools
@@ -217,12 +218,26 @@ def run_profile(state_path, bp, bv, nw):
     de_checks(f"P{bp} V{bv} w{nw}", fit, obj, ref)
 
 
+def run_profile_add(exp, block):
+    """Three vector-add launches at n = 2^exp, for a profiler: known traffic of 3 x n x 4 bytes per call."""
+    n = 2 ** exp
+    x = torch.rand(n, device=DEV)
+    y = torch.rand(n, device=DEV)
+    for _ in range(3):
+        out = va.add(x, y, block)
+    torch.cuda.synchronize()
+    check(f"vector add n=2^{exp} BLOCK {block} bitwise", lambda: torch.testing.assert_close(out, x + y, rtol=0, atol=0))
+    print(f"vector add: n = 2^{exp}, BLOCK {block}, expected traffic per call {3 * n * 4 / 1e6:.2f} MB "
+          f"(read {2 * n * 4 / 1e6:.2f}, write {n * 4 / 1e6:.2f})")
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--state", required=True, help="npz written by export_de_state.py")
     ap.add_argument("--only", default="vector_add,elementwise,lse,de")
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--profile", nargs=3, type=int, metavar=("BLOCK_P", "BLOCK_V", "NUM_WARPS"))
+    ap.add_argument("--profile-add", nargs=2, type=int, metavar=("LOG2_N", "BLOCK"))
     ap.add_argument("--save-outputs", default=None)
     args = ap.parse_args()
 
@@ -233,6 +248,8 @@ if __name__ == "__main__":
 
     if args.profile:
         run_profile(args.state, *args.profile)
+    elif args.profile_add:
+        run_profile_add(*args.profile_add)
     else:
         sections = {"vector_add": lambda: run_vector_add(args.quick), "elementwise": lambda: run_elementwise(args.quick),
                     "lse": lambda: run_lse(args.quick), "de": lambda: run_de(args.state, args.quick, args.save_outputs)}
