@@ -748,6 +748,7 @@ python amd_run.py --state results/de_state_2026-10-26.npz > results/amd_run_rtx4
 **Results.**
 - **Refactor:** every max relative difference equals `de_triton_fused_strain_2026-10-26.txt` (e.g. 4.824e-05, 1.957e-05, 3.218e-05, and the whole sweep column). Timings within 3%: P8 V128 0.247 ms in both, XLA 1.534 ms in both, P4 V128 with eager strain 0.549 vs 0.564 ms.
 - **Export:** 0.93 MB. The saved outputs reproduce 3b.1 (PyTorch vs JAX: 1.133e-04 / 3.344e-05). Round trip: PyTorch and Triton outputs bitwise equal (4 × True), saved JAX outputs equal to the live ones.
+- **No JAX/ABL import:** `python -c "import sys, amd_run; print([m for m in ('jax','ABL','evosax','numpyro') if m in sys.modules])"` printed `[]` (console output, not saved).
 - **`amd_run.py` on the 4060 Ti:** all checks PASS. The PyTorch reference recomputed from the file differs from the saved one by 0; Triton P8 V128 w4 is bitwise equal to the saved output.
 
 Same quantities as Phase 3, this run (median ms; sizes differ where noted):
