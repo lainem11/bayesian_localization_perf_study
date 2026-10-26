@@ -593,3 +593,24 @@ python de_reference.py > results/de_reference_2026-10-23.txt
 No candidate has a strain penalty after the constraint function (0 of 512).
 
 **Conclusion.** **Passes** (1.1e-4 < 1e-3; same argmin). The expected change is small because it is a mean over 7444 vertices of changes in a posterior that sums to 1. The constraint function rescales violating candidates analytically onto the strain limit, so none is penalized. The largest fitness values (up to 1.5e6) come from the E-field penalty on candidates whose maximum E-field exceeds 200 V/m. The relative differences (~1e-4) are much larger than float32's 1.2e-7: probably cancellation in |p − p′| between nearly equal probabilities, plus different summation orders in the logsumexps (not investigated).
+
+## 3b.2 Baseline timings of the DE objective
+
+**Method.** `de_bench.py` times three implementations on the fixed state of 3b.1 with the same method: 200 calls queued back to back, one sync at the end (as inside the DE's scan, L2 warm), 7 repeats, median and IQR of the per-call time. Variants: the session's jitted objective (XLA), eager `objective_torch`, and `torch.compile(objective_torch)` (default mode, TF32 off). Commit `7790eca`, clean tree:
+```
+python de_bench.py > results/de_bench_2026-10-23.txt
+```
+
+**Results** (ms per call):
+
+| variant | q25 | median | q75 |
+|---|---:|---:|---:|
+| XLA (JAX) | 1.565 | 1.566 | 1.599 |
+| torch eager | 6.891 | 6.931 | 6.989 |
+| torch.compile | 2.546 | 2.547 | 2.548 |
+
+**Conclusion.**
+- XLA takes 1.566 ms per call, 1.4% above Phase 1's 1.544 ms (within day-to-day drift; this population is constrained, Phase 1's was not).
+- Eager PyTorch is 4.4× slower than XLA. Its kernels process 15–46 MB arrays, so it is probably memory-bound on its unfused intermediates rather than launch-bound (kernel count not profiled).
+- `torch.compile` is 1.6× slower than XLA. Not investigated.
+- The bar for a fused kernel is XLA's 1.566 ms.
