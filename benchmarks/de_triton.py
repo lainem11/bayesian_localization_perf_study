@@ -75,16 +75,21 @@ def _tile(pc0, pc1, pc2, pc3, pc4, W, B, CS, PRM, LSP, V, v_offs, v_mask, lo, hi
 
 @triton.jit
 def de_objective_kernel(pop_ptr, W, B, CS, PRM, LSP, fit_ptr, obj_ptr, P, V, lo, hi, efield_limit, penalty,
-                        BLOCK_P: tl.constexpr, BLOCK_V: tl.constexpr):
+                        strain_limit, BLOCK_P: tl.constexpr, BLOCK_V: tl.constexpr, FUSED_STRAIN: tl.constexpr):
     pid = tl.program_id(axis=0)
     p_offs = pid * BLOCK_P + tl.arange(0, BLOCK_P)
     p_mask = p_offs < P
-    # This program's candidates: 5 coil weights each, as [BLOCK_P, 1] columns
-    pc0 = tl.load(pop_ptr + p_offs * 5 + 0, mask=p_mask, other=0.0)[:, None]
-    pc1 = tl.load(pop_ptr + p_offs * 5 + 1, mask=p_mask, other=0.0)[:, None]
-    pc2 = tl.load(pop_ptr + p_offs * 5 + 2, mask=p_mask, other=0.0)[:, None]
-    pc3 = tl.load(pop_ptr + p_offs * 5 + 3, mask=p_mask, other=0.0)[:, None]
-    pc4 = tl.load(pop_ptr + p_offs * 5 + 4, mask=p_mask, other=0.0)[:, None]
+    # This program's candidates: 5 coil weights each, [BLOCK_P]
+    w0 = tl.load(pop_ptr + p_offs * 5 + 0, mask=p_mask, other=0.0)
+    w1 = tl.load(pop_ptr + p_offs * 5 + 1, mask=p_mask, other=0.0)
+    w2 = tl.load(pop_ptr + p_offs * 5 + 2, mask=p_mask, other=0.0)
+    w3 = tl.load(pop_ptr + p_offs * 5 + 3, mask=p_mask, other=0.0)
+    w4 = tl.load(pop_ptr + p_offs * 5 + 4, mask=p_mask, other=0.0)
+    pc0 = w0[:, None]                 # as [BLOCK_P, 1] columns for broadcasting
+    pc1 = w1[:, None]
+    pc2 = w2[:, None]
+    pc3 = w3[:, None]
+    pc4 = w4[:, None]
 
     # Pass 1: online logsumexp over vertices for both outcomes, and the max E-field
     m1 = tl.full([BLOCK_P], float("-inf"), tl.float32)
@@ -123,11 +128,23 @@ def de_objective_kernel(pop_ptr, W, B, CS, PRM, LSP, fit_ptr, obj_ptr, P, V, lo,
 
     obj = -acc / V
     viol = tl.maximum(emax - efield_limit, 0.0)
+    fit = obj + penalty * viol * viol
+    if FUSED_STRAIN:
+        # 5-coil strain penalty (port of optimizer_constraints.py:19-37), [BLOCK_P]
+        a0 = tl.abs(w0)
+        a1 = tl.abs(w1)
+        a2 = tl.abs(w2)
+        a3 = tl.abs(w3)
+        a4 = tl.abs(w4)
+        coil5 = (tl.sqrt(0.9 * a0 * a0 + a1 * a1) * 0.2 + tl.sqrt(0.9 * a2 * a2 + a3 * a3)) * a4
+        coil1 = (0.9 * a1 + 0.7 * tl.sqrt(a2 * a2 + 0.9 * a3 * a3) + 0.2 * a4) * a0
+        sv = tl.maximum(tl.maximum(coil5, coil1) - strain_limit, 0.0)
+        fit += penalty * sv * sv
     tl.store(obj_ptr + p_offs, obj, mask=p_mask)
-    tl.store(fit_ptr + p_offs, obj + penalty * viol * viol, mask=p_mask)
+    tl.store(fit_ptr + p_offs, fit, mask=p_mask)
 
 
-def de_objective_triton(pop, k, BLOCK_P=4, BLOCK_V=128, num_warps=4):
+def de_objective_triton(pop, k, BLOCK_P=4, BLOCK_V=128, num_warps=4, fused_strain=True):
     """Returns (fitness, -expected_change), both [P], like objective_torch."""
     assert pop.shape[1] == 5 and pop.is_contiguous() and pop.dtype == torch.float32
     P = pop.shape[0]
@@ -135,9 +152,10 @@ def de_objective_triton(pop, k, BLOCK_P=4, BLOCK_V=128, num_warps=4):
     obj = torch.empty_like(fit)
     grid = (triton.cdiv(P, BLOCK_P),)
     de_objective_kernel[grid](pop, k["W"], k["B"], k["CS"], k["PRM"], k["LSP"], fit, obj, P, k["V"],
-                              k["lo"], k["hi"], k["efield_limit"], k["penalty"],
-                              BLOCK_P=BLOCK_P, BLOCK_V=BLOCK_V, num_warps=num_warps)
-    fit = fit + k["penalty"] * torch.relu(strain_torch(pop) - k["strain_limit"]) ** 2   # 5 numbers per candidate
+                              k["lo"], k["hi"], k["efield_limit"], k["penalty"], k["strain_limit"],
+                              BLOCK_P=BLOCK_P, BLOCK_V=BLOCK_V, FUSED_STRAIN=fused_strain, num_warps=num_warps)
+    if not fused_strain:      # strain penalty in eager PyTorch: ~20 small kernels, each launched from the CPU
+        fit = fit + k["penalty"] * torch.relu(strain_torch(pop) - k["strain_limit"]) ** 2
     return fit, obj
 
 
@@ -167,15 +185,18 @@ if __name__ == "__main__":
     configs = [(1, 512, 4), (1, 1024, 4), (2, 256, 4), (2, 512, 4), (4, 128, 4),
                (4, 256, 4), (8, 64, 4), (8, 128, 4), (16, 64, 4)]
     print(f"\nms per call, 200 calls back to back, 7 repeats")
-    print(f"{'variant':>22} {'programs':>9} {'q25':>8} {'median':>8} {'q75':>8} {'max rel diff':>13}")
+    print(f"{'variant':>30} {'programs':>9} {'q25':>8} {'median':>8} {'q75':>8} {'max rel diff':>13}")
     med, q25, q75 = back_to_back_ms(xla, jax_sync)
-    print(f"{'XLA (JAX), start':>22} {'':>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f}")
+    print(f"{'XLA (JAX), start':>30} {'':>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f}")
     for bp, bv, nw in configs:
         fn = lambda bp=bp, bv=bv, nw=nw: de_objective_triton(pop_t, k, bp, bv, nw)[0]
         _, o = de_objective_triton(pop_t, k, bp, bv, nw)
         rel = ((o.double() - obj_ref.double()).abs() / obj_ref.double().abs()).max().item()
         med, q25, q75 = back_to_back_ms(fn, torch_sync)
-        print(f"{f'Triton P{bp} V{bv} w{nw}':>22} {512 // bp:>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f} {rel:>13.3e}")
+        print(f"{f'Triton P{bp} V{bv} w{nw}':>30} {512 // bp:>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f} {rel:>13.3e}")
+    fn = lambda: de_objective_triton(pop_t, k, 4, 128, 4, fused_strain=False)[0]
+    med, q25, q75 = back_to_back_ms(fn, torch_sync)
+    print(f"{'Triton P4 V128, eager strain':>30} {128:>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f}")
     med, q25, q75 = back_to_back_ms(xla, jax_sync)
-    print(f"{'XLA (JAX), end':>22} {'':>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f}")
+    print(f"{'XLA (JAX), end':>30} {'':>9} {q25:>8.3f} {med:>8.3f} {q75:>8.3f}")
     st["S"].end_session()
