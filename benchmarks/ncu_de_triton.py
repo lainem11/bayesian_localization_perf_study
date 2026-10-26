@@ -6,7 +6,7 @@ import torch
 import triton
 from env_info import collect_env
 from de_reference import fixed_state
-from de_triton import prepare, de_objective_triton
+from de_kernel import prepare, de_objective_triton
 
 bp, bv = int(sys.argv[1]), int(sys.argv[2])
 for key, value in collect_env().items():

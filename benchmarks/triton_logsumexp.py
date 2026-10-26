@@ -2,7 +2,6 @@
 import torch
 import triton
 import triton.language as tl
-from env_info import collect_env
 
 @triton.jit
 def lse_kernel(x_ptr, out_ptr, n_cols, stride_row, BLOCK: tl.constexpr):
@@ -30,6 +29,7 @@ def gbps(rows, cols, ms):
     return (rows * cols + rows) * 4 / (ms * 1e-3) / 1e9
 
 if __name__ == "__main__":
+    from env_info import collect_env      # imported here so the kernels can be imported without JAX
     for key, value in collect_env().items():
         print(f"{key}: {value}")
     print(f"Triton version: {triton.__version__}\n")

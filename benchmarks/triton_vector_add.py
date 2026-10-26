@@ -2,7 +2,6 @@
 import torch
 import triton
 import triton.language as tl
-from env_info import collect_env
 
 @triton.jit
 def add_kernel(x_ptr, y_ptr, out_ptr, n_elements, BLOCK_SIZE: tl.constexpr):
@@ -24,6 +23,7 @@ def gbps(n, ms):
     return 3 * n * 4 / (ms * 1e-3) / 1e9        # float32: 4 bytes, 2 reads + 1 write
 
 if __name__ == "__main__":
+    from env_info import collect_env      # imported here so the kernels can be imported without JAX
     for key, value in collect_env().items():
         print(f"{key}: {value}")
     print(f"Triton version: {triton.__version__}\n")

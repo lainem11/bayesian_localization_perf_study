@@ -2,23 +2,10 @@
 # Times the DE objective on the fixed state of de_reference.py: XLA (the session's jitted objective),
 # eager PyTorch and torch.compile of the reference. Same method for all: 200 calls queued
 # back to back, one sync at the end (as inside the DE's scan), repeated 7 times.
-import time
-import numpy as np
 import torch
 from env_info import collect_env
-from de_reference import fixed_state, objective_torch
-
-
-def back_to_back_ms(fn, sync, calls=200, repeats=7):
-    sync(fn())                                        # warm-up (and compilation)
-    per_call = []
-    for _ in range(repeats):
-        t0 = time.perf_counter()
-        for _ in range(calls):
-            out = fn()                                # queue calls without waiting
-        sync(out)                                     # wait once, at the end
-        per_call.append(1e3 * (time.perf_counter() - t0) / calls)
-    return np.median(per_call), np.percentile(per_call, 25), np.percentile(per_call, 75)
+from de_reference import fixed_state
+from de_torch import objective_torch, back_to_back_ms   # back_to_back_ms moved to de_torch.py
 
 
 if __name__ == "__main__":
