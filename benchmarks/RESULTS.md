@@ -2,7 +2,7 @@
 
 Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is complete. Phase 4 (AMD/ROCm) is next.
+**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is complete. Phase 4 (AMD/ROCm) is in progress: 4.1 (JAX-free kernels, saved state, tested on NVIDIA) is done.
 
 ## Setup
 
@@ -717,3 +717,63 @@ ncu --kernel-name regex:de_objective_kernel --launch-skip 2 --launch-count 1 \
 - The occupancy improvements listed in 3b.4 (not tried).
 - The causes of the L2-resident bimodal timings, the halved L2 estimate, the P8 DRAM bytes, or the ncu-vs-harness duration gap.
 - Performance on other GPUs.
+
+---
+
+# Phase 4: Triton kernels on AMD (ROCm)
+
+Plan: run the Phase 3 Triton kernels on an AMD Instinct GPU in the cloud, check correctness, measure performance against that GPU's own peak, and profile with the ROCm profilers. Different hardware, so not a vendor comparison.
+
+## 4.1 JAX-free kernels and a saved state (on the RTX 4060 Ti)
+
+**Goal.** The AMD instance will have PyTorch and Triton but not JAX or ABL. The fixed state of 3b.1 needs both (and the XLA autotuning file), so it is computed once on NVIDIA and saved, and the kernels are moved into modules that import only torch and triton.
+
+**Changes** (commit `8630c9c`):
+- `de_torch.py`: `objective_torch`, `strain_torch`, `compare`, `back_to_back_ms`, moved unchanged from `de_reference.py` and `de_bench.py`; new `load_state()`.
+- `de_kernel.py`: `prepare`, the kernel and `de_objective_triton`, moved unchanged from `de_triton.py`; new `kernel_info()` (registers and spills reported by the compiled kernel). "Unchanged" was checked by comparing each function's source text with the previous commit.
+- The old scripts import from these modules; the three exercise scripts import `env_info` only under `__main__`.
+- New: `env_light.py` (environment record with torch and triton only), `export_de_state.py`, `amd_run.py` (all exercise kernels and the DE kernel from the saved state; every check prints PASS/FAIL without stopping the run).
+- `export_de_state.py` saves the raw inputs (`prepare()` runs again on the target), the scalars as JSON (Triton compiles a separate variant for an int and a float argument, so the type is kept), and three reference outputs: JAX (fitness and the penalty-free expected change), the PyTorch reference, and Triton P8 V128 w4. The file is `.npz`, loaded with `allow_pickle=False`.
+- `benchmarks/phase4_step1.patch` was committed by mistake in `8630c9c` and removed in the next commit.
+
+**Pass criteria** (set before running): the refactored `de_triton.py` reproduces the max relative differences of 3b.3 exactly; the reloaded state reproduces the PyTorch and Triton outputs bitwise.
+
+**Method.** Commit `8630c9c`, clean tree, autotuning file loaded:
+```
+python de_triton.py > results/de_triton_refactor_2026-10-26.txt
+python export_de_state.py results/de_state_2026-10-26.npz > results/export_de_state_2026-10-26.txt
+python amd_run.py --state results/de_state_2026-10-26.npz > results/amd_run_rtx4060ti_2026-10-26.txt
+```
+
+**Results.**
+- **Refactor:** every max relative difference equals `de_triton_fused_strain_2026-10-26.txt` (e.g. 4.824e-05, 1.957e-05, 3.218e-05, and the whole sweep column). Timings within 3%: P8 V128 0.247 ms in both, XLA 1.534 ms in both, P4 V128 with eager strain 0.549 vs 0.564 ms.
+- **Export:** 0.93 MB. The saved outputs reproduce 3b.1 (PyTorch vs JAX: 1.133e-04 / 3.344e-05). Round trip: PyTorch and Triton outputs bitwise equal (4 × True), saved JAX outputs equal to the live ones.
+- **`amd_run.py` on the 4060 Ti:** all checks PASS. The PyTorch reference recomputed from the file differs from the saved one by 0; Triton P8 V128 w4 is bitwise equal to the saved output.
+
+Same quantities as Phase 3, this run (median ms; sizes differ where noted):
+
+| quantity | Phase 3 | `amd_run` 4.1 |
+|---|---:|---:|
+| vector add, best GB/s | 256.3 (2²⁶, BLOCK 4096) | 257.1 (2²⁸, BLOCK 8192) |
+| fused elementwise Triton / compiled | 4.1324 / 4.1487 (2²⁶) | 9.2088 / 8.7178 (2²⁷) |
+| logsumexp 122 MB, Triton 1024 / compiled | 0.5448 / 0.5816 (run 2) | 0.5448 / 0.5857 |
+| logsumexp 976 MB, Triton 2048 / compiled | – | 3.6649 / 6.8449 |
+| DE: Triton P8 V128 w4 / torch.compile / eager | 0.247 / 2.547 / 6.931 | 0.251 / 2.570 / 6.878 |
+
+DE kernel, effect of `num_warps` (selected rows; regs = registers per thread from `kernel_info`):
+
+| config | w1 | w2 | w4 | w8 |
+|---|---:|---:|---:|---:|
+| P8 V128, ms (regs) | 1.021 (255) | 0.619 (255) | **0.249** (128) | 0.281 (128) |
+| P16 V128, ms (regs) | 2.864 (255, 520 spills) | 1.066 (255) | 0.315 (255) | 0.284 (214) |
+| P16 V512, ms (spills) | 3.486 (3492) | 1.493 (912) | 0.848 (460) | 0.330 (8) |
+
+**Conclusion.**
+- **The move and the export are lossless**, by both criteria. The AMD run can be checked against the saved outputs, including bitwise on the export GPU.
+- **The best DE configuration is unchanged: P8 V128 w4.** 8 warps is 13% slower (0.281 / 0.249, *derived*). Too few warps for a large tile hits the 255-register limit and spills to memory (P16 V512 w1: 3492 spills, 3.486 ms); more warps spread the tile and remove the spills. `kernel_info` reports 128 registers for P8 V128 w4, the same as ncu in 3b.4. Why w8 is slower at P8 V128 was not investigated (*hypothesis:* the row reductions over BLOCK_V span twice as many warps and go through shared memory).
+- **Online logsumexp at 976 MB: 266.2 GB/s, 92% of the 288 GB/s spec (*derived*), and 1.87× faster than `torch.compile`** (6.8449 / 3.6649, *derived*). At 122 MB the gap is only 7.5% (0.5857 / 0.5448). Inductor's generated kernel was not inspected, so the cause is open.
+- **Vector add, block sweep at 2²⁸ is not monotonic**: BLOCK 256 reaches 256.8 GB/s, as fast as 4096 (257.0) and 8192 (257.1), while 512–2048 give 250.6–251.5 GB/s. At 2²⁶ (3a.1) the speed rose steadily up to 4096. The 3a.1 hypothesis (larger blocks → more loads in flight) does not hold in general; the differences are ~2%.
+- **Fused elementwise at 2²⁷:** Triton's median is 5.6% above `torch.compile`'s (*derived*), but Triton's IQR is wide (8.33–9.35 ms) and at 2²⁶ the two matched. One run; not a robust difference.
+- **Measurement caveat:** eager at 2²⁷ shows q25 = median = q75 = 53.0811 ms. `do_bench` repeats the call ⌊100 ms / estimated time⌋ times (`rep=100`; checked in the source of the installed Triton 3.7.0), so a 53 ms function is measured **once**. Quantiles of calls over ~50 ms are single samples.
+- The 15 MB logsumexp gave only the slow mode (≈0.083–0.095 ms) in this run.
+- DE: Triton is 10.2× faster than `torch.compile` and 27.4× faster than eager on this GPU (2.570 / 0.251 and 6.878 / 0.251, *derived*, same run).
