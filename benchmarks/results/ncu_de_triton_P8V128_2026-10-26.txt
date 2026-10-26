@@ -1,0 +1,105 @@
+==PROF== Connected to process 35983 (/home/mikael/.local/share/uv/python/cpython-3.13.16-linux-x86_64-gnu/bin/python3.13)
+==PROF== Profiling "de_objective_kernel": 0%....50%....100% - 8 passes
+GIT branch: perf-study
+GIT commit: 108c801db478266421f10dbe6fa32ccea770c354
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+Triton version: 3.7.0
+config: BLOCK_P 8, BLOCK_V 128, 4 warps, strain in kernel
+==PROF== Disconnected from process 35983
+[35983] python3.13@127.0.0.1
+  de_objective_kernel (64, 1, 1)x(128, 1, 1), Context 1, Stream 7, Device 0, CC 8.9
+    Section: Command line profiler metrics
+    ---------------------- ----------- ------------
+    Metric Name            Metric Unit Metric Value
+    ---------------------- ----------- ------------
+    dram__bytes_read.sum         Mbyte         4.81
+    dram__bytes_write.sum         byte            0
+    gpu__time_duration.sum          us       273.92
+    lts__t_bytes.sum             Mbyte        71.70
+    ---------------------- ----------- ------------
+
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz         8.74
+    SM Frequency                    Ghz         2.50
+    Elapsed Cycles                cycle       684679
+    Memory Throughput                 %        56.93
+    DRAM Throughput                   %         6.28
+    Duration                         us       273.92
+    L1/TEX Cache Throughput           %        58.61
+    L2 Cache Throughput               %        12.51
+    SM Active Cycles              cycle    665537.38
+    Compute (SM) Throughput           %        56.93
+    ----------------------- ----------- ------------
+
+    OPT   This kernel grid is too small to fill the available resources on this device, resulting in only 0.47 full     
+          waves across all SMs. Look at Launch Statistics for more details.                                             
+
+    Section: Launch Statistics
+    -------------------------------- --------------- ---------------
+    Metric Name                          Metric Unit    Metric Value
+    -------------------------------- --------------- ---------------
+    Block Size                                                   128
+    Function Cache Configuration                     CachePreferNone
+    Grid Size                                                     64
+    Registers Per Thread             register/thread             128
+    Shared Memory Configuration Size           Kbyte           16.38
+    Driver Shared Memory Per Block       Kbyte/block            1.02
+    Dynamic Shared Memory Per Block       byte/block             128
+    Static Shared Memory Per Block        byte/block               0
+    # SMs                                         SM              34
+    Stack Size                                                  1024
+    Threads                                   thread            8192
+    # TPCs                                                        17
+    Enabled TPC IDs                                              all
+    Uses Green Context                                             0
+    Waves Per SM                                                0.47
+    -------------------------------- --------------- ---------------
+
+    OPT   If you execute __syncthreads() to synchronize the threads of a block, it is recommended to have at least two  
+          blocks per multiprocessor (compared to the currently executed 1.9 blocks) This way, blocks that aren't        
+          waiting for __syncthreads() can keep the hardware busy.                                                       
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Block Limit SM                        block           24
+    Block Limit Registers                 block            4
+    Block Limit Shared Mem                block           14
+    Block Limit Warps                     block           12
+    Theoretical Active Warps per SM        warp           16
+    Theoretical Occupancy                     %        33.33
+    Achieved Occupancy                        %        15.77
+    Achieved Active Warps Per SM           warp         7.57
+    ------------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 52.7%                                                                                     
+          The difference between calculated theoretical (33.3%) and measured achieved occupancy (15.8%) can be the      
+          result of warp scheduling overheads or workload imbalances during the kernel execution. Load imbalances can   
+          occur between warps within a block as well as across blocks of the same kernel. See the CUDA Best Practices   
+          Guide (https://docs.nvidia.com/cuda/cuda-c-best-practices-guide/index.html#occupancy) for more details on     
+          optimizing occupancy.                                                                                         
+    ----- --------------------------------------------------------------------------------------------------------------
+    OPT   Est. Local Speedup: 66.67%                                                                                    
+          The 4.00 theoretical warps per scheduler this kernel can issue according to its occupancy are below the       
+          hardware maximum of 12. This kernel's theoretical occupancy (33.3%) is limited by the number of required      
+          registers.                                                                                                    
+
