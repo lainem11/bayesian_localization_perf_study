@@ -1,0 +1,72 @@
+==PROF== Connected to process 26165 (/home/mikael/.local/share/uv/python/cpython-3.13.16-linux-x86_64-gnu/bin/python3.13)
+==PROF== Profiling "de_objective_kernel": 0%....50%....100% - 7 passes
+GIT branch: perf-study
+GIT commit: 956491576c464fb509a554240b0eea29cdb95409
+GIT dirty: False
+GPU model and driver version: NVIDIA GeForce RTX 4060 Ti |  610.88
+GPU memory:: 16 GB
+PyTorch version: 2.12.0+cu126
+CUDA version for PyTorch: 12.6
+Is CUDA available: True
+JAX version: 0.7.2
+jaxlib version: 0.7.2
+JAX CUDA libs version: 0.7.2
+JAX devices: [CudaDevice(id=0)]
+XLA_PYTHON_CLIENT_PREALLOCATE: false
+XLA_FLAGS: --xla_gpu_load_autotune_results_from=/home/mikael/bayesian_localization_perf_study/benchmarks/autotune/rtx4060ti.textproto
+EvoSax version: 0.2.0
+NumPyro version: 0.20.1
+Python version: 3.13.16
+OS:: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+Triton version: 3.7.0
+
+Default config (BLOCK_P 4, BLOCK_V 128, 4 warps)
+expected change, Triton vs torch reference: ref range [-1.167492e-04, -1.452208e-06], max abs diff 3.229e-10, max rel diff 4.824e-05, argmin equal: True (237 vs 237)
+full fitness, Triton vs torch reference: ref range [-1.167492e-04, 1.527618e+06], max abs diff 7.500e-01, max rel diff 1.957e-05, argmin equal: True (237 vs 237)
+full fitness, Triton vs JAX: ref range [-1.167489e-04, 1.527618e+06], max abs diff 1.500e+00, max rel diff 3.218e-05, argmin equal: True (237 vs 237)
+
+ms per call, 200 calls back to back, 7 repeats
+               variant  programs      q25   median      q75  max rel diff
+      XLA (JAX), start              1.611    1.618    1.626
+     Triton P1 V512 w4       512    4.186    4.198    4.303     1.768e-04
+    Triton P1 V1024 w4       512    4.229    4.315    4.339     1.767e-04
+     Triton P2 V256 w4       256    4.221    4.262    4.337     1.767e-04
+     Triton P2 V512 w4       256    4.255    4.295    4.406     1.768e-04
+     Triton P4 V128 w4       128    4.084    4.190    4.212     4.824e-05
+     Triton P4 V256 w4       128    4.271    4.336    4.370     1.767e-04
+      Triton P8 V64 w4        64    4.207    4.215    4.289     6.503e-05
+     Triton P8 V128 w4        64    4.269    4.275    4.319     4.824e-05
+     Triton P16 V64 w4        32    4.171    4.216    4.264     6.503e-05
+        XLA (JAX), end              1.567    1.574    1.619
+==PROF== Disconnected from process 26165
+[26165] python3.13@127.0.0.1
+  de_objective_kernel (128, 1, 1)x(128, 1, 1), Context 1, Stream 7, Device 0, CC 8.9
+    Section: Command line profiler metrics
+    ---------------------- ----------- ------------
+    Metric Name            Metric Unit Metric Value
+    ---------------------- ----------- ------------
+    dram__bytes_read.sum         Kbyte       939.01
+    dram__bytes_write.sum        Kbyte        11.78
+    gpu__time_duration.sum          us       307.30
+    lts__t_bytes.sum             Mbyte       121.31
+    ---------------------- ----------- ------------
+
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz         8.74
+    SM Frequency                    Ghz         2.49
+    Elapsed Cycles                cycle       766086
+    Memory Throughput                 %        61.95
+    DRAM Throughput                   %         1.11
+    Duration                         us       307.30
+    L1/TEX Cache Throughput           %        65.16
+    L2 Cache Throughput               %        18.99
+    SM Active Cycles              cycle    726937.79
+    Compute (SM) Throughput           %        61.95
+    ----------------------- ----------- ------------
+
+    INF   Compute and Memory are well-balanced: To reduce runtime, both computation and memory traffic must be reduced. 
+          Check both the Compute Workload Analysis and Memory Workload Analysis sections.                               
+
