@@ -614,3 +614,58 @@ python de_bench.py > results/de_bench_2026-10-23.txt
 - Eager PyTorch is 4.4× slower than XLA. Its kernels process 15–46 MB arrays, so it is probably memory-bound on its unfused intermediates rather than launch-bound (kernel count not profiled).
 - `torch.compile` is 1.6× slower than XLA. Not investigated.
 - The bar for a fused kernel is XLA's 1.566 ms.
+
+## 3b.3 Fused Triton kernel for the DE objective
+
+**Hypothesis.** XLA's objective is DRAM-bound because it writes and re-reads ~430 MB of [512 × 7444] intermediates per call (1.3, 1.5). A kernel that keeps every per-(candidate, vertex) value in registers moves only its ~1 MB of inputs and should be several times faster.
+
+**Kernel** (`de_triton.py`).
+- Each program handles `BLOCK_P` candidates and loops over the vertices in chunks of `BLOCK_V`, computing a [BLOCK_P × BLOCK_V] tile (E-field, magnitude, angle terms, responsivity, both numerators) in registers. Only per-candidate running values are kept.
+- **Pass 1:** online logsumexp of both numerators (normalizers log P(y=1), log P(y=0)) and the max E-field. **Pass 2:** recomputes the numerators and accumulates the expected change, which needs the normalizers at every vertex and can't be rescaled online because of the absolute value.
+- Inputs (0.95 MB: E-field set × max slope, PCA basis, reference direction, 6 parameters, log prior) are reordered on the host to [rows × V] so loads are contiguous along vertices.
+- The angle terms use cos/sin identities instead of atan2, cos and sin. log(1 − r) is computed directly.
+- The 5-coil strain penalty is computed in the kernel (`FUSED_STRAIN`) or, in the first version, in eager PyTorch after it.
+
+**Method.** Same fixed state and criterion as 3b.1. Back-to-back timing as in 3b.2, XLA timed at the start and end of each run. Clean tree, autotuning file loaded:
+```
+python de_triton.py > results/de_triton_2026-10-26.txt                    # commit 3cd1b1b, strain in eager PyTorch
+ncu --kernel-name regex:de_objective_kernel --launch-count 1 --section SpeedOfLight \
+    --metrics dram__bytes_read.sum,dram__bytes_write.sum,lts__t_bytes.sum,gpu__time_duration.sum \
+    python de_triton.py > results/ncu_de_triton_2026-10-26.txt             # commit 9564915, P4 V128
+python de_triton.py > results/de_triton_fused_strain_2026-10-26.txt       # commit 7b5fc03, strain in the kernel
+```
+(`de_triton_2026-10-23.txt` was run without `XLA_FLAGS`. Its JAX comparison failed (max rel diff 453) and its fixed state differed, so it is not used.)
+
+**Equivalence** (P4 V128, `de_triton_fused_strain`): expected change vs the PyTorch reference, max rel diff 4.824e-05; full fitness vs JAX, max rel diff 3.218e-05; argmin 237 in all. **Passes.** Over the sweep, max rel diff ≤ 1.768e-04.
+
+**Nsight Compute** (P4 V128, strain in eager PyTorch):
+
+| metric | value |
+|---|---:|
+| duration | 307.30 µs |
+| DRAM read / write | 939.01 KB / 11.78 KB |
+| L2 traffic (`lts__t_bytes.sum`) | 121.31 MB |
+| DRAM / L2 / L1 throughput | 1.11% / 18.99% / 65.16% |
+| Compute (SM) throughput | 61.95% |
+
+**Timing** (ms per call, median (IQR)):
+
+| variant | programs | strain in PyTorch (`de_triton`) | strain in kernel (`fused_strain`) |
+|---|---:|---:|---:|
+| XLA, start / end | – | 1.534 / 1.533 | 1.535 / 1.534 |
+| Triton P1 V512 | 512 | 0.991 | 0.808 |
+| Triton P2 V512 | 256 | 0.618 | 0.438 |
+| Triton P4 V128 | 128 | 0.538 | 0.274 (0.273–0.274) |
+| Triton P8 V128 | 64 | 0.535 | **0.247** (0.246–0.253) |
+| Triton P16 V64 | 32 | 0.544 | 0.353 |
+
+In the fused-strain run, P4 V128 with the strain in eager PyTorch takes 0.564 ms.
+
+**Conclusion.**
+- **DRAM traffic per call fell from ~430 MB (HLO model) to 0.95 MB measured**; DRAM throughput is 1.1%. The kernel is no longer DRAM-bound. ncu reports compute and L1 at ~62–65%, neither saturated ("well-balanced").
+- **The kernel is 6.2× faster than XLA** (1.534 / 0.247 ms, P8 V128, back to back, same run).
+- **Computing the strain penalty in eager PyTorch cost ~0.29 ms per call** (0.564 vs 0.274 ms): about 20 small kernels launched from the CPU. With it, all configurations from P4 to P16 sat at ~0.54 ms, a CPU-side floor. With the strain inside the kernel, the configurations separate.
+- **Block sizes matter by up to 3.3×** (0.808 vs 0.247 ms). More candidates per program reuse each loaded vertex value for more candidates; at P16 only 32 programs remain for 34 SMs. BLOCK_V 128 was best for both P4 and P8.
+- Measured L2 traffic (121 MB) is half a simple estimate of 2 passes × 0.95 MB × 128 programs; not investigated.
+- **Trade-off: fusing the strain penalty costs flexibility.** The penalty is specific to the 5-coil stimulator (`optimizer_constraints.py`), and in `src` it is a pluggable function (`strain_func`, or `None`). In the kernel it is hard-coded behind a compile-time switch, so a different stimulator or constraint means editing the kernel. Alternatives that keep it pluggable: a few precompiled constraint variants selected by a `constexpr`, or keeping the penalty in the host language and removing the launch overhead some other way (e.g. a CUDA graph, or computing it inside XLA's scan when integrated). Not tried.
+- Limitations: one fixed population and state; ncu profiled the earlier configuration. Under ncu the kernel took 307 µs, longer than the 0.274 ms per call of the same configuration back to back. ncu locks the clocks by default (`--clock-control boost`, from `ncu --help`); whether that explains the difference was not checked. The kernel is standalone, not integrated into the DE loop.
