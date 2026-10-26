@@ -2,7 +2,7 @@
 
 Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is in progress.
+**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is complete. Phase 4 (AMD/ROCm) is next.
 
 ## Setup
 
@@ -668,4 +668,52 @@ In the fused-strain run, P4 V128 with the strain in eager PyTorch takes 0.564 ms
 - **Block sizes matter by up to 3.3×** (0.808 vs 0.247 ms). More candidates per program reuse each loaded vertex value for more candidates; at P16 only 32 programs remain for 34 SMs. BLOCK_V 128 was best for both P4 and P8.
 - Measured L2 traffic (121 MB) is half a simple estimate of 2 passes × 0.95 MB × 128 programs; not investigated.
 - **Trade-off: fusing the strain penalty costs flexibility.** The penalty is specific to the 5-coil stimulator (`optimizer_constraints.py`), and in `src` it is a pluggable function (`strain_func`, or `None`). In the kernel it is hard-coded behind a compile-time switch, so a different stimulator or constraint means editing the kernel. Alternatives that keep it pluggable: a few precompiled constraint variants selected by a `constexpr`, or keeping the penalty in the host language and removing the launch overhead some other way (e.g. a CUDA graph, or computing it inside XLA's scan when integrated). Not tried.
-- Limitations: one fixed population and state; ncu profiled the earlier configuration. Under ncu the kernel took 307 µs, longer than the 0.274 ms per call of the same configuration back to back. ncu locks the clocks by default (`--clock-control boost`, from `ncu --help`); whether that explains the difference was not checked. The kernel is standalone, not integrated into the DE loop.
+- Limitations: one fixed population and state; the ncu run above is the earlier configuration (see 3b.4 for the best one). Under ncu the kernel took 307 µs, longer than the 0.274 ms per call of the same configuration back to back. ncu locks the clocks by default (`--clock-control boost`, from `ncu --help`); whether that explains the difference was not checked. The kernel is standalone, not integrated into the DE loop.
+
+## 3b.4 Nsight Compute on the best configuration
+
+**Method.** `ncu_de_triton.py` builds the fixed state and calls the kernel 3 times in one configuration; ncu profiles the third call. Commit `108c801`, clean tree:
+```
+ncu --kernel-name regex:de_objective_kernel --launch-skip 2 --launch-count 1 \
+    --section SpeedOfLight --section Occupancy --section LaunchStats \
+    --metrics dram__bytes_read.sum,dram__bytes_write.sum,lts__t_bytes.sum,gpu__time_duration.sum \
+    python ncu_de_triton.py 8 128 > results/ncu_de_triton_P8V128_2026-10-26.txt
+```
+
+**Results** (P8 V128, strain in kernel; P4 V128 from 3b.3 for comparison, strain in PyTorch there):
+
+| metric | P4 V128 | P8 V128 |
+|---|---:|---:|
+| grid (programs) | 128 | 64 |
+| duration | 307.30 µs | 273.92 µs |
+| DRAM read | 939.01 KB | 4.81 MB |
+| L2 traffic (`lts__t_bytes.sum`) | 121.31 MB | 71.70 MB |
+| DRAM / L2 / L1 throughput | 1.11 / 18.99 / 65.16% | 6.28 / 12.51 / 58.61% |
+| Compute (SM) throughput | 61.95% | 56.93% |
+| registers per thread | – | 128 |
+| theoretical / achieved occupancy | – | 33.33% / 15.77% |
+| waves per SM | – | 0.47 |
+
+**Conclusion.**
+- **Halving the number of programs cut L2 traffic to 59%** (71.70 / 121.31 MB): each loaded vertex value is reused for 8 candidates instead of 4.
+- **The kernel is now occupancy-limited.** At 128 registers per thread, only 4 programs (16 warps) fit on an SM: theoretical occupancy 33%, limited by registers (ncu). The grid of 64 programs is 0.47 waves (1.9 programs per SM), so achieved occupancy is 15.8%: ~7.6 active warps per SM out of 48. Too few warps to hide memory and instruction latency, so neither compute nor memory is near its limit (57–59%).
+- **DRAM read is 4.81 MB here vs 0.94 MB at P4**, still small (6.3% throughput). Not explained; in the DE loop the inputs would stay in L2 anyway.
+- The duration under ncu (273.92 µs, clocks locked by default) is again ~10% longer than the back-to-back per-call time (0.247 ms), as at P4 (307 µs vs 0.274 ms).
+- **Not tried:** more programs without losing reuse, by splitting the vertex range across programs and combining partial logsumexps (two small extra reductions), or fewer registers per thread (more warps per tile, e.g. `num_warps` 8).
+
+## Phase 3 summary
+
+**Can claim:**
+- Wrote Triton kernels from scratch, each tested against PyTorch: vector add (256.3 GB/s, 89% of spec, after a block-size sweep), a fused elementwise chain of ABL's response model (5.9× over eager, explained by bytes moved, matched by `torch.compile`), and an online logsumexp (5.4× over eager, ≈6% over `torch.compile` at 122 MB).
+- Wrote a PyTorch reference of the JAX DE objective, checked against JAX under a criterion fixed in advance.
+- Wrote a fused Triton kernel for the DE objective (two-pass online logsumexp, register tiling over candidates × vertices). It reduced measured DRAM traffic to ~1–5 MB per call against ~430 MB modelled for XLA, and runs **6.2× faster than XLA** (0.247 vs 1.534 ms per call back to back, same run), equivalent within 1.8e-4 relative difference with the same best candidate.
+- Found with timing and Nsight Compute that a ~20-kernel eager strain penalty doubled the call time (CPU launch overhead), and fused it into the kernel, noting the cost in flexibility.
+- Diagnosed the final kernel as occupancy-limited (128 registers per thread, 0.47 waves) with Nsight Compute.
+- Found that inputs that fit in L2 give bimodal timings and apparent bandwidths above the DRAM peak.
+
+**Cannot claim:**
+- Any speedup of the DE or of a session: the kernel is standalone, not integrated into the JAX DE loop.
+- Equivalence beyond one fixed state and population, or effects on the DE's chosen stimuli.
+- The occupancy improvements listed in 3b.4 (not tried).
+- The causes of the L2-resident bimodal timings, the halved L2 estimate, the P8 DRAM bytes, or the ncu-vs-harness duration gap.
+- Performance on other GPUs.
