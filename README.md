@@ -1,3 +1,7 @@
+## GPU performance study
+
+This repository includes a performance study of ABL (https://github.com/lainem11/bayesian_localization). See "benchmarks/README.md" for the write-up.
+
 # ABL: Adaptive Bayesian Localization
 
 [![DOI](https://zenodo.org/badge/1238737755.svg)](https://doi.org/10.5281/zenodo.20441812)
