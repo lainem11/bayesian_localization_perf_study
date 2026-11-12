@@ -1,0 +1,32 @@
+### date
+2026-11-12T12:01:18+00:00
+### host OS
+PRETTY_NAME="Ubuntu 24.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.5 LTS (Noble Numbat)"
+### host ROCm
+cat: /opt/rocm/.info/version: No such file or directory
+### amd-smi version
+AMDSMI Tool: 27.1.0+7da43026 | AMDSMI Library version: 27.1.0 | ROCm version: 10.1.0 | amdgpu version: 6.19.14.31400000 | ionic version: N/A
+### docker ps
+CONTAINER ID   IMAGE     COMMAND                  CREATED          STATUS          PORTS                                         NAMES
+c2c5ba4f7e0c   rocm      "/bin/sh -c 'jupyter…"   56 minutes ago   Up 56 minutes   0.0.0.0:8888->8888/tcp, [::]:8888->8888/tcp   rocm
+### docker images
+REPOSITORY                     TAG                                                    DIGEST                                                                    IMAGE ID       CREATED        SIZE
+rocm                           latest                                                 sha256:57e7f14df2f36fdcf3481d5371d9c3ac6ecd32b6db6105fb5aa43761bc99a1fd   57e7f14df2f3   5 weeks ago    13.7GB
+ubuntu                         24.04                                                  sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55   534baea6a22c   7 weeks ago    119MB
+rocm/pytorch                   rocm7.14.1_ubuntu24.04_py3.12_pytorch_release_2.12.0   sha256:cc9b00f90b85c97b015b040fa55c8d1b404b7cacc6ad57d74ee3451c97508da1   cc9b00f90b85   2 months ago   49.7GB
+rocm/device-metrics-exporter   v1.5.0                                                 sha256:73f3978ad439c24a45560ad1ee56a759ddfd213ce1f7e0e0503cf91e67205c5e   73f3978ad439   6 months ago   1.32GB
+### our container (strange_shaw)
+Error response from daemon: No such container: strange_shaw
+### droplet container (rocm)
+cat: /opt/rocm/.info/version: No such file or directory
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+### counter test in the rocm container (killed after 120 s)
+timeout: failed to run command 'rocprofv3': No such file or directory
+exit 127
+find: '/tmp/pmc_test': No such file or directory
+find: '/tmp/pmc_test': No such file or directory

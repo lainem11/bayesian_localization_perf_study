@@ -1,0 +1,15 @@
+W1112 11:23:28.102068     912 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.236501 sec
+W1112 11:23:28.102571     912 simple_timer.cpp:55] [rocprofv3] 'python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4' ::     0.000000 sec
+W1112 11:23:30.323053     912 tool.cpp:3082] HSA version 1.21.0 initialized (instance=0)
+aqlprofile API table load failed: HSA_STATUS_ERROR: A generic error has occurred.
+W1112 11:23:31.674210     912 tool.cpp:3811] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 caught signal 6...
+W1112 11:23:31.674254     912 tool.cpp:3834] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 will wait for 0 children to exit
+W1112 11:23:31.674257     912 tool.cpp:3849] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 finalizing after signal 6...
+W1112 11:23:31.675234     912 simple_timer.cpp:55] [rocprofv3] output generation ::     0.000506 sec
+W1112 11:23:31.675301     912 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.000585 sec
+W1112 11:23:31.675381     912 tool.cpp:3891] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 found chained signal handler for 6... executing chained sigaction (SIGINFO)
+*** SIGABRT received at time=1794482611 on cpu 8 ***
+[symbolize_elf.inc : 379] RAW: Unable to get high fd: rc=0, limit=1024
+PC: @     0x7ce643d88c0c  (unknown)  pthread_kill
+W1112 11:23:31.676255     912 tool.cpp:3811] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 caught signal 6...
+W1112 11:51:13.122746     912 tool.cpp:3811] [PPID=911][PID=912][TID=912][rocprofv3_error_signal_handler] rocprofv3 caught signal 15...

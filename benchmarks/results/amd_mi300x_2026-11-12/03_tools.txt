@@ -1,0 +1,196 @@
+/opt/venv/bin/rocprofv3
+/opt/venv/bin/rocprofv3-avail
+usage: rocprofv3 [options] -- <application> [application options]
+
+ROCProfilerV3 Run Script
+
+options:
+  -h, --help                            show this help message and exit
+  -v, --version                         Print the version information and exit
+
+I/O options:
+  -i INPUT, --input INPUT               Input file for run configuration (JSON or YAML) or counter collection (TXT)
+  -o OUTPUT_FILE, --output-file OUTPUT_FILE
+                                        For the output file name. If nothing specified default path is `%hostname%/%pid%`
+  -d OUTPUT_DIRECTORY, --output-directory OUTPUT_DIRECTORY
+                                        For adding output path where the output files will be saved. If nothing specified default path is `%hostname%/%pid%`
+  -f {csv,json,pftrace,otf2,rocpd} [{csv,json,pftrace,otf2,rocpd} ...], --output-format {csv,json,pftrace,otf2,rocpd} [{csv,json,pftrace,otf2,rocpd} ...]
+                                        For adding output format (supported formats: csv, json, pftrace, otf2, rocpd)
+  --output-config [BOOL]                Generate a output file of the rocprofv3 configuration, e.g. out_config.json
+  --log-level {fatal,error,warning,info,trace,env,config}
+                                        Set the desired log level
+  -E EXTRA_COUNTERS, --extra-counters EXTRA_COUNTERS
+                                        Path to YAML file containing extra counter definitions
+
+Aggregate tracing options:
+  -r [BOOL], --runtime-trace [BOOL]     Collect tracing data for HIP runtime API, Marker (ROCTx) API, RCCL API, rocDecode API, rocJPEG API, Memory operations (copies, scratch, and allocation), and Kernel dispatches. Similar to --sys-trace but without tracing HIP compiler API and the underlying HSA API.
+  -s [BOOL], --sys-trace [BOOL]         Collect tracing data for HIP API, HSA API, Marker (ROCTx) API, RCCL API, rocDecode API, rocJPEG API, Memory operations (copies, scratch, and allocations), and Kernel dispatches.
+
+Basic tracing options:
+  --hip-trace [BOOL]                    Combination of --hip-runtime-trace and --hip-compiler-trace. This option only enables the tracing of the HIP API. Unlike previous iterations of rocprof, this does not enable kernel tracing, memory copy tracing, etc
+  --marker-trace [BOOL]                 For collecting Marker (ROCTx) Traces. Similar to --roctx-trace option in earlier rocprof versions but with improved ROCTx library with more features
+  --kernel-trace [BOOL]                 For collecting Kernel Dispatch Traces
+  --memory-copy-trace [BOOL]            For collecting Memory Copy Traces. This was part of HIP and HSA traces in previous rocprof versions but is now a separate option
+  --memory-allocation-trace [BOOL]      For collecting Memory Allocation Traces. Displays starting address, allocation size, and agent where allocation occurred.
+  --kfd-trace [BOOL]                    For collecting --kfd-page-migration-trace, --kfd-page-mapping-trace, --kfd-queue-trace, and --kfd-dropped-events-trace. KFD (Kernel Fusion Driver) traces capture low level driver routines involved in mapping, unmapping, and migration of data between GPU and system memories, as well as eviction/restoration of GPU queues to facilitate such routines.
+  --scratch-memory-trace [BOOL]         For collecting Scratch Memory operations Traces. Helps in determining scratch allocations and manage them efficiently
+  --hsa-trace [BOOL]                    For collecting --hsa-core-trace, --hsa-amd-trace,--hsa-image-trace and --hsa-finalizer-trace. This option only enables the tracing of the HSA API. Unlike previous iterations of rocprof, this does not enable kernel tracing, memory copy tracing, etc
+  --rccl-trace [BOOL]                   For collecting RCCL(ROCm Communication Collectives Library. Also pronounced as 'Rickle' ) Traces
+  --kokkos-trace [BOOL]                 Enable built-in Kokkos Tools support (implies --marker-trace and --kernel-rename)
+  --rocdecode-trace [BOOL]              For collecting rocDecode Traces
+  --rocjpeg-trace [BOOL]                For collecting rocJPEG Traces
+
+Granular tracing options:
+  --hip-runtime-trace [BOOL]            For collecting HIP Runtime API Traces, e.g. public HIP API functions starting with 'hip' (i.e. hipSetDevice).
+  --hip-compiler-trace [BOOL]           For collecting HIP Compiler generated code Traces, e.g. HIP API functions starting with '__hip' (i.e. __hipRegisterFatBinary).
+  --hsa-core-trace [BOOL]               For collecting HSA API Traces (core API), e.g. HSA functions prefixed with only 'hsa_' (i.e. hsa_init).
+  --hsa-amd-trace [BOOL]                For collecting HSA API Traces (AMD-extension API), e.g. HSA function prefixed with 'hsa_amd_' (i.e. hsa_amd_coherency_get_type).
+  --hsa-image-trace [BOOL]              For collecting HSA API Traces (Image-extension API), e.g. HSA functions prefixed with only 'hsa_ext_image_' (i.e. hsa_ext_image_get_capability).
+  --hsa-finalizer-trace [BOOL]          For collecting HSA API Traces (Finalizer-extension API), e.g. HSA functions prefixed with only 'hsa_ext_program_' (i.e. hsa_ext_program_create).
+  --kfd-page-migration-trace [BOOL]     For collecting KFD Trace events involving migration of pages across memory devices.
+  --kfd-page-mapping-trace [BOOL]       For collecting KFD Trace events involving faulting, mapping, and invalidation of pages.
+  --kfd-queue-trace [BOOL]              For collecting KFD Trace events involving GPU queue eviction and restore operations.
+  --kfd-dropped-events-trace [BOOL]     For collecting KFD Trace events involving events dropped by KFD.
+
+Counter collection options:
+  --pmc [PMC ...]                       Specify Performance Monitoring Counters to collect (space-separated). For single-pass: --pmc COUNTER1 COUNTER2 ... For multi-pass: --pmc "GROUP1_C1 GROUP1_C2" --pmc "GROUP2_C1 GROUP2_C2" ... Note: Use multiple --pmc flags for multi-pass collection when counters cannot be collected simultaneously due to hardware limitations
+
+Streaming Performance Monitor(SPM) options:
+  --spm-beta-enabled [BOOL]             enable SPM; beta version
+  --spm [SPM ...]                       Specify SPM events to collect(comma OR space separated in case of more than 1 counters). Note: job will fail if entire set of counters cannot be collected in single pass
+  --spm-sample-interval SPM_SAMPLE_INTERVAL
+                                        Specifies the sampling interval for SPM counter collection. It is used with spm-sample-interval-unit to define how frequently counters are sampled
+  --spm-sample-interval-unit {sclk_cycles}
+                                        Specifies the unit for the SPM sample interval. Used with --spm-sample-interval to define the sampling interval
+
+PC sampling options:
+  --pc-sampling-beta-enabled [BOOL]     enable pc sampling support; beta version
+  --pc-sampling-unit {instructions,cycles,time}
+  --pc-sampling-method {stochastic,host_trap}
+  --pc-sampling-interval PC_SAMPLING_INTERVAL
+
+Post-processing tracing options:
+  --stats [BOOL]                        For collecting statistics of enabled tracing types. Must be combined with one or more tracing options. No default kernel stats unlike previous rocprof versions
+  -S [BOOL], --summary [BOOL]           Output single summary of tracing data at the conclusion of the profiling session
+  -D [BOOL], --summary-per-domain [BOOL]
+                                        Output summary for each tracing domain at the conclusion of the profiling session
+  --summary-groups REGULAR_EXPRESSION [REGULAR_EXPRESSION ...]
+                                        Output a summary for each set of domains matching the regular expression, e.g. 'KERNEL_DISPATCH|MEMORY_COPY' will generate a summary from all the tracing data in the KERNEL_DISPATCH and MEMORY_COPY domains; '*._API' will generate a summary from all the tracing data in the HIP_API, HSA_API, and MARKER_API domains
+
+Summary options:
+  --summary-output-file SUMMARY_OUTPUT_FILE
+                                        Output summary to a file, stdout, or stderr (default: stderr)
+  -u {sec,msec,usec,nsec}, --summary-units {sec,msec,usec,nsec}
+                                        Timing units for output summary
+
+Kernel naming options:
+  -M [BOOL], --mangled-kernels [BOOL]   Do not demangle the kernel names
+  -T [BOOL], --truncate-kernels [BOOL]  Truncate the demangled kernel names. In earlier rocprof versions, this was known as --basenames [on/off]
+  --kernel-rename [BOOL]                Use region names defined by roctxRangePush/roctxRangePop regions to rename the kernels. Known as --roctx-rename in earlier rocprof versions
+
+Filtering options:
+  --profile-mpi-ranks RANK_SPECIFICATION
+                                        Specify which MPI ranks should provide profile/trace output using comma-separated ranges and individual ranks (e.g., '0-3,8,10-15'). If not specified, all ranks provide output. The tool runs on all ranks but only selected ranks generate output files.
+  --mpi-world-rank-variable ENVIRONMENT_VARIABLE
+                                        Specify the environment variable to use for determining the MPI rank (e.g., 'MY_CUSTOM_RANK_VAR'). If not specified, the tool will automatically detect the rank from common MPI environment variables.
+  --mpi-world-size-variable ENVIRONMENT_VARIABLE
+                                        Specify the environment variable to use for determining the MPI world size (e.g., 'MY_CUSTOM_SIZE_VAR'). If not specified, the tool will automatically detect the world size from common MPI environment variables.
+  --kernel-include-regex REGULAR_EXPRESSION
+                                        Include the kernels matching this filter from counter-collection and thread-trace data (non-matching kernels will be excluded)
+  --kernel-exclude-regex REGULAR_EXPRESSION
+                                        Exclude the kernels matching this filter from counter-collection and thread-trace data (applied after --kernel-include-regex option)
+  --kernel-iteration-range KERNEL_ITERATION_RANGE [KERNEL_ITERATION_RANGE ...]
+                                        Iteration range
+  -P (START_DELAY_TIME):(COLLECTION_TIME):(REPEAT) [(START_DELAY_TIME):(COLLECTION_TIME):(REPEAT) ...], --collection-period (START_DELAY_TIME):(COLLECTION_TIME):(REPEAT) [(START_DELAY_TIME):(COLLECTION_TIME):(REPEAT) ...]
+                                        The times are specified in seconds by default, but the unit can be changed using the `--collection-period-unit` option. Start Delay Time is the time in seconds before the collection begins, Collection Time is the duration in seconds for which data is collected, and Rate is the number of times the cycle is repeated. A repeat of 0 indicates that the cycle will repeat indefinitely. Users can specify multiple configurations, each defined by a triplet in the format `start_delay:collection_time:repeat`
+  --collection-period-unit {hour,min,sec,msec,usec,nsec}
+                                        To change the unit used in `--collection-period` or `-P`, you can specify the desired unit using the `--collection-period-unit` option. The available units are `hour` for hours, `min` for minutes, `sec` for seconds, `msec` for milliseconds, `usec` for microseconds, and `nsec` for nanoseconds
+  --selected-regions [BOOL]             If set, rocprofv3 will only profile regions of code surrounded by roctxProfilerResume(0) and roctxProfilerPause(0).
+  --selected-regions-ref-count [BOOL]   If set, rocprofv3 will reference count roctxProfilerResume and roctxProfilerPause calls to ignore nested pause/resume pairs
+
+Perfetto-specific options:
+  --perfetto-backend {inprocess,system}
+                                        Perfetto data collection backend. 'system' mode requires starting traced and perfetto daemons
+  --perfetto-buffer-size KB             Size of buffer for perfetto output in KB. default: 1 GB
+  --perfetto-buffer-fill-policy {discard,ring_buffer}
+                                        Policy for handling new records when perfetto has reached the buffer limit
+  --perfetto-shmem-size-hint KB         Perfetto shared memory size hint in KB. default: 64 KB
+
+Display options:
+  -L [BOOL], --list-avail [BOOL]        List available PC sampling configurations, SPM configurations, and metrics for counter collection. Backed by a valid YAML file. In earlier rocprof versions, this was known as --list-basic, --list-derived and --list-counters
+  --group-by-queue [BOOL]               For displaying the HIP streams that kernels and memory copy operations are submitted to rather than HSA queues.
+
+Advanced options:
+  --preload [PRELOAD ...]               Libraries to prepend to LD_PRELOAD (useful for sanitizer libraries)
+  --rocm-root PATH                      Use the given path as the root ROCm path instead of the relative path of this script
+  --sdk-soversion SDK_SOVERSION         Use provided rocprofiler-sdk shared object version number when resolving library paths, e.g. `--sdk-soversion=X` for librocprofiler-sdk.so.X
+  --sdk-version SDK_VERSION             Use provided rocprofiler-sdk version number when resolving library paths, e.g. `--sdk-version=X.Y.Z` for librocprofiler-sdk.so.X.Y.Z
+  -A {absolute,relative,type-relative}, --agent-index {absolute,relative,type-relative}
+                                        absolute == node_id, e.g. Agent-0, Agent-2, Agent-4- absolute index of the agent regardless of cgroups masking.
+                                                This is a monotonically increasing number that is incremented for every folder in /sys/class/kfd/kfd/topology/nodes.
+                                            relative == logical_node_id,
+                                                e.g. Agent-0, Agent-1, Agent-2- relative index of the agent accounting for cgroups masking.
+                                                This is a monotonically increasing number which is incremented for every folder in /sys/class/kfd/kfd/topology/nodes/ whose properties file was non-empty.
+                                            type-relative == logical_node_type_id,
+                                                e.g. CPU-0, GPU-0, GPU-1- relative index of the agent accounting for cgroups masking where indexing starts at zero for each agent type.
+                                                It is a monotonically increasing number for each agent type and is incremented for every type folder in /sys/class/kfd/kfd/topology/nodes/ whose properties file is non-empty.
+                                                If agent-index is not provided then the default value for it is relative.
+  --disable-signal-handlers [BOOL]      Enables the signal handlers in the rocprofv3 tool.
+                                                When --disable-signal-handlers is set to true,
+                                                and application has its signal handler on SIGSEGV or similar installed,
+                                                then its signal handler will be used, not the rocprofv3 signal handler.
+                                                Note: glog still installs signal handlers which provide backtraces
+  --process-sync [BOOL]                 Enables the process synchronization in the rocprofv3 tool finalization stage.
+                                                When --process-sync is set to true,
+                                                and rocprofv3 tool will force process to wait for its peer processes finishing write the trace data,
+                                                then they proceed.
+                                                Note: some workloads will terminate the process group when one of the processes is finished
+  --minimum-output-data KB              Output files are generated only if output data size > minimum output data".
+                                                It can be used for controlling the generation of output files so that user don't receive empty files.
+                                                The input is in KB units.
+  -p PID, --pid PID, --attach PID       Attach to a target process by pid and execute as a tool from within said process.
+  --attach-duration-msec ATTACH_DURATION_MSEC
+                                        When --pid is used, sets the amount of time in milliseconds the profiler will be attached before detaching. When unset, the profiler will wait until Enter is pressed to detach.
+  --attach-children [BOOL]              When --pid is used, attach to the target process and all of its descendant processes. Enabled by default; use --attach-children=false to attach only to the specified PID.
+  --attach-sync-output [BOOL]           [Attach mode only] Generate output files synchronously during detachment (default: async). Use this option when scripts need to access output files immediately after rocprofv3 exits
+
+Advanced Thread Trace (ATT) options:
+  --advanced-thread-trace [BOOL], --att [BOOL]
+                                        Enables thread trace
+  --att-library-path ATT_LIBRARY_PATH [ATT_LIBRARY_PATH ...]
+                                        Search path to decoder library.
+  --att-target-cu ATT_TARGET_CU         Target compute unit ID (or WGP). Default 1
+  --att-simd-select ATT_SIMD_SELECT     Bitmask of SIMDs to enable (gfx9) or SIMD ID (gfx10+). Default 0xF
+  --att-consecutive-kernels ATT_CONSECUTIVE_KERNELS
+                                        Consecutive kernels to profile with ATT. Default 0
+  --att-buffer-size ATT_BUFFER_SIZE     Thread trace buffer size. Default 256MB
+  --att-shader-engine-mask ATT_SHADER_ENGINE_MASK
+                                        Bitmask of shader engines to enable. Default 0x1
+  --att-gpu-index ATT_GPU_INDEX         Comma-separated list of GPU index(es) to enable thread trace. Default: All
+  --att-perfcounters ATT_PERFCOUNTERS   (gfx9) List of performance counters, and optionally their SIMD mask.
+  --att-perfcounter-ctrl ATT_PERFCOUNTER_CTRL
+                                        (gfx9) Integer in [1,32] range specifying collection period. 0 = disabled.
+  --att-perfcounter-target-only [BOOL]  (gfx9) Enable performance counters only for the target CU. This heavily reduces bandwidth use.
+  --att-activity ATT_ACTIVITY           (gfx9) Collect HW activity counters. Integer in [1,16] range specifying collection period. Recommended: 8
+  --att-serialize-all [BOOL]            Serialize all kernels, not just the traced ones.
+
+rocprofv3 requires double-hyphen (--) before the application to be executed, e.g.
+
+    $ rocprofv3 [<rocprofv3-option> ...] -- <application> [<application-arg> ...]
+    $ rocprofv3 --hip-trace -- ./myapp -n 1
+
+For MPI applications (or other job launchers such as SLURM), place rocprofv3 inside the job launcher:
+
+    $ mpirun -n 4 rocprofv3 --hip-trace -- ./mympiapp
+
+For MPI applications, select specific ranks to provide profile/trace output:
+
+    $ mpirun -n 16 rocprofv3 --hip-trace --profile-mpi-ranks 0-3,8 -- ./mympiapp
+    $ srun -n 32 rocprofv3 --hip-trace --profile-mpi-ranks 0 -- ./myapp
+
+For attachment profiling of running processes:
+
+    $ rocprofv3 --attach <PID> --hip-trace --kernel-trace
+    $ rocprofv3 --attach 1234 --attach-duration-msec 10 --hsa-trace
+bash: line 1: rocprof-compute: command not found
+bash: line 1: rocprof-compute: command not found

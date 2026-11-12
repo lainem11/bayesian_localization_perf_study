@@ -1,0 +1,24 @@
+GIT branch: perf-study
+GIT commit: 74fd3ee0c5a449ef473c07fade541440583a9e98
+GIT dirty: False
+PyTorch version: 2.12.0+rocm7.14.1
+torch.version.cuda: None
+torch.version.hip: 7.14.60850
+GPU available: True
+GPU name: AMD Instinct MI300X VF
+GPU memory: 192 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 304
+props.gcnArchName: gfx942:sramecc+:xnack-
+props.warp_size: 64
+props.L2_cache_size: 4194304
+props.major: 9
+props.minor: 4
+GPU count: 1
+Triton version: 3.8.0
+pip triton / pytorch-triton-rocm: 3.8.0+git4cff872c.rocm7.14.1 / not installed
+/opt/rocm/.info/version: unavailable (FileNotFoundError)
+amd-smi version: AMDSMI Tool: 26.5.0+ca887ee8 | AMDSMI Library version: 26.5.0 | ROCm version: 7.14.1 | amdgpu version: 6.19.14.31400000 | ionic version: N/A
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.12.3
+OS: Linux-6.8.0-146-generic-x86_64-with-glibc2.39
+CPU: x86_64

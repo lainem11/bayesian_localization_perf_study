@@ -1,0 +1,66 @@
+Python 3.12.3
+amd-torch-device-gfx1010       2.12.0+rocm7.14.1
+amd-torch-device-gfx1011       2.12.0+rocm7.14.1
+amd-torch-device-gfx1012       2.12.0+rocm7.14.1
+amd-torch-device-gfx1030       2.12.0+rocm7.14.1
+amd-torch-device-gfx1031       2.12.0+rocm7.14.1
+amd-torch-device-gfx1032       2.12.0+rocm7.14.1
+amd-torch-device-gfx1033       2.12.0+rocm7.14.1
+amd-torch-device-gfx1034       2.12.0+rocm7.14.1
+amd-torch-device-gfx1035       2.12.0+rocm7.14.1
+amd-torch-device-gfx1036       2.12.0+rocm7.14.1
+amd-torch-device-gfx1100       2.12.0+rocm7.14.1
+amd-torch-device-gfx1101       2.12.0+rocm7.14.1
+amd-torch-device-gfx1102       2.12.0+rocm7.14.1
+amd-torch-device-gfx1103       2.12.0+rocm7.14.1
+amd-torch-device-gfx110x       2.12.0+rocm7.14.1
+amd-torch-device-gfx1150       2.12.0+rocm7.14.1
+amd-torch-device-gfx1151       2.12.0+rocm7.14.1
+amd-torch-device-gfx1152       2.12.0+rocm7.14.1
+amd-torch-device-gfx1153       2.12.0+rocm7.14.1
+amd-torch-device-gfx115x       2.12.0+rocm7.14.1
+amd-torch-device-gfx12-0       2.12.0+rocm7.14.1
+amd-torch-device-gfx1200       2.12.0+rocm7.14.1
+amd-torch-device-gfx1201       2.12.0+rocm7.14.1
+amd-torch-device-gfx908        2.12.0+rocm7.14.1
+amd-torch-device-gfx90a        2.12.0+rocm7.14.1
+amd-torch-device-gfx942        2.12.0+rocm7.14.1
+amd-torch-device-gfx950        2.12.0+rocm7.14.1
+amd-torchvision-device-gfx1010 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1011 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1012 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1030 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1031 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1032 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1033 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1034 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1035 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1036 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1100 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1101 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1102 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1103 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1150 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1151 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1152 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1153 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1200 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx1201 0.27.0+rocm7.14.1
+amd-torchvision-device-gfx908  0.27.0+rocm7.14.1
+amd-torchvision-device-gfx90a  0.27.0+rocm7.14.1
+amd-torchvision-device-gfx942  0.27.0+rocm7.14.1
+amd-torchvision-device-gfx950  0.27.0+rocm7.14.1
+numpy                          2.5.2
+torch                          2.12.0+rocm7.14.1
+torchaudio                     2.11.0+rocm7.14.1
+torchvision                    0.27.0+rocm7.14.1
+triton                         3.8.0+git4cff872c.rocm7.14.1
+ls: cannot access '/opt/rocm*': No such file or directory
+cat: /opt/rocm/.info/version: No such file or directory
+Linux 542ed3dfd010 6.8.0-146-generic #146-Ubuntu SMP PREEMPT_DYNAMIC Thu Sep  3 16:12:30 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+20
+               total        used        free      shared  buff/cache   available
+Mem:             235           6         181           0          50         229
+Swap:              0           0           0
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda1       697G  102G  596G  15% /repo

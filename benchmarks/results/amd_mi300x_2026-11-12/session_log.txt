@@ -1,0 +1,35 @@
+commit 74fd3ee0c5a449ef473c07fade541440583a9e98, status (excluding results/): ''
+=== 2026-11-12T11:16:52+00:00 00_env_light: python env_light.py
+    exit 0, 1 s
+=== 2026-11-12T11:16:53+00:00 01_versions: bash -c python --version; python -m pip list 2>/dev/null | grep -i -E 'torch|triton|numpy';                              ls -d /opt/rocm*; cat /opt/rocm/.info/version; uname -a; nproc; free -g; df -h .
+    exit 0, 1 s
+=== 2026-11-12T11:16:54+00:00 02_gpu_info: bash -c amd-smi static || rocm-smi --showall || nvidia-smi
+    exit 0, 0 s
+=== 2026-11-12T11:16:54+00:00 03_tools: bash -c which rocprofv3 rocprof-compute rocprofv3-avail; rocprofv3 --help;                              rocprof-compute --version; rocprof-compute profile --help
+    exit 127, 0 s
+=== 2026-11-12T11:16:54+00:00 04_counters: bash -c rocprofv3-avail list || rocprofv3 -L
+    exit 0, 1 s
+=== 2026-11-12T11:16:55+00:00 10_smoke: python amd_run.py --state results/de_state_2026-10-26.npz --quick
+    exit 0, 29 s
+=== 2026-11-12T11:17:24+00:00 11_full: python amd_run.py --state results/de_state_2026-10-26.npz --save-outputs results/amd_mi300x_2026-11-12/de_outputs.npz
+    exit 0, 351 s
+fastest DE config on this GPU: P2V512w8
+=== 2026-11-12T11:23:15+00:00 20_rocprofv3_trace_de_P8V128w4: rocprofv3 --kernel-trace --stats --output-format csv --output-directory results/amd_mi300x_2026-11-12/rocprofv3_de_P8V128w4 -- python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4
+    exit 0, 4 s
+=== 2026-11-12T11:23:19+00:00 20_rocprofv3_trace_de_P2V512w8: rocprofv3 --kernel-trace --stats --output-format csv --output-directory results/amd_mi300x_2026-11-12/rocprofv3_de_P2V512w8 -- python amd_run.py --state results/de_state_2026-10-26.npz --profile 2 512 8
+    exit 0, 4 s
+=== 2026-11-12T11:23:23+00:00 21_rocprofv3_trace_add: rocprofv3 --kernel-trace --stats --output-format csv --output-directory results/amd_mi300x_2026-11-12/rocprofv3_add -- python amd_run.py --state results/de_state_2026-10-26.npz --profile-add 28 4096
+    exit 0, 4 s
+=== 2026-11-12T11:23:27+00:00 22_rocprofv3_pmc_de: rocprofv3 --pmc SQ_WAVES GRBM_GUI_ACTIVE --output-format csv --output-directory results/amd_mi300x_2026-11-12/rocprofv3_pmc_de -- python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4
+    exit 137, 1676 s
+=== 2026-11-12T11:51:23+00:00 30_rocprof_compute_profile_de_P8V128w4: rocprof-compute profile --name de_P8V128w4_mi300x_2026-11-12 -k de_objective_kernel -- python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4
+    exit 127, 0 s
+    no workload directory for de_P8V128w4, analyze skipped
+=== 2026-11-12T11:51:23+00:00 30_rocprof_compute_profile_de_P2V512w8: rocprof-compute profile --name de_P2V512w8_mi300x_2026-11-12 -k de_objective_kernel -- python amd_run.py --state results/de_state_2026-10-26.npz --profile 2 512 8
+    exit 127, 0 s
+    no workload directory for de_P2V512w8, analyze skipped
+=== 2026-11-12T11:51:23+00:00 30_rocprof_compute_profile_add: rocprof-compute profile --name add_mi300x_2026-11-12 -k add_kernel --no-roof -- python amd_run.py --state results/de_state_2026-10-26.npz --profile-add 28 4096
+    exit 127, 0 s
+    no workload directory for add, analyze skipped
+=== 2026-11-12T11:51:23+00:00 40_full_repeat: python amd_run.py --state results/de_state_2026-10-26.npz
+    exit 0, 350 s

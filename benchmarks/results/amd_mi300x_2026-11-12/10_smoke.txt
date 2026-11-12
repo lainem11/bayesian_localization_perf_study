@@ -1,0 +1,117 @@
+GIT branch: perf-study
+GIT commit: 74fd3ee0c5a449ef473c07fade541440583a9e98
+GIT dirty: False
+PyTorch version: 2.12.0+rocm7.14.1
+torch.version.cuda: None
+torch.version.hip: 7.14.60850
+GPU available: True
+GPU name: AMD Instinct MI300X VF
+GPU memory: 192 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 304
+props.gcnArchName: gfx942:sramecc+:xnack-
+props.warp_size: 64
+props.L2_cache_size: 4194304
+props.major: 9
+props.minor: 4
+GPU count: 1
+Triton version: 3.8.0
+pip triton / pytorch-triton-rocm: 3.8.0+git4cff872c.rocm7.14.1 / not installed
+/opt/rocm/.info/version: unavailable (FileNotFoundError)
+amd-smi version: AMDSMI Tool: 26.5.0+ca887ee8 | AMDSMI Library version: 26.5.0 | ROCm version: 7.14.1 | amdgpu version: 6.19.14.31400000 | ionic version: N/A
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.12.3
+OS: Linux-6.8.0-146-generic-x86_64-with-glibc2.39
+CPU: x86_64
+command args: {'state': 'results/de_state_2026-10-26.npz', 'only': 'vector_add,elementwise,lse,de', 'quick': True, 'profile': None, 'profile_add': None, 'save_outputs': None}
+
+====================================================================================================
+1. Vector add (triton_vector_add.py kernel); GB/s = 3 x n x 4 bytes / median time
+====================================================================================================
+         n  MB moved  triton1024 ms    GB/s  triton4096 ms    GB/s  torch ms    GB/s
+  check n=2^20 bitwise vs torch: PASS
+   1048576     12.58         0.0083  1508.7         0.0076  1660.5    0.0069  1814.1
+  check n=2^24 bitwise vs torch: PASS
+  16777216    201.33         0.0755  2668.2         0.0788  2554.2    0.0472  4266.4
+
+Block-size sweep, n = 2^24 (201.3 MB moved)
+ BLOCK  programs num_warps   q25 ms  median ms   q75 ms  GB/s (median)
+  check BLOCK 256 bitwise: PASS
+   256     65536         4   0.0737     0.0742   0.0748         2712.9
+  check BLOCK 1024 bitwise: PASS
+  1024     16384         4   0.0747     0.0754   0.0761         2669.6
+  check BLOCK 4096 bitwise: PASS
+  4096      4096         4   0.0783     0.0789   0.0795         2552.9
+  check BLOCK 16384 bitwise: PASS
+ 16384      1024         4   0.0775     0.0786   0.0794         2562.0
+warp size reported by the compiled kernel: 64
+
+====================================================================================================
+2. Fused elementwise chain (triton_fused_elementwise.py); eff. GB/s counts 16 bytes per element
+====================================================================================================
+  check triton vs eager (assert_close defaults): PASS
+  triton vs eager: bitwise-equal fraction 0.569314, max abs diff 1.907e-06
+  check compiled vs eager (assert_close defaults): PASS
+  compiled vs eager: bitwise-equal fraction 0.579658, max abs diff 1.907e-06
+
+n = 2^22, minimum traffic 67.1 MB
+  variant   q25 ms  median ms   q75 ms  eff. GB/s
+   triton   0.0277     0.0296   0.0301     2268.0
+    eager   0.1081     0.1088   0.1097      616.6
+ compiled   0.0265     0.0273   0.0279     2454.3
+
+====================================================================================================
+3. Row-wise online logsumexp (triton_logsumexp.py); one program per row
+====================================================================================================
+  check [512 x 7444] triton vs torch: PASS
+  stability (x + 100): naive finite = False, triton finite = True, max abs diff vs torch = 7.629e-06
+  check [512 x 7444] compiled vs torch: PASS
+
+rows 512, cols 7444, minimum traffic 15.25 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   0.0780     0.0786   0.0793      194.0
+    compiled   0.0128     0.0134   0.0143     1135.2
+  triton 512   0.0188     0.0190   0.0192      802.4
+ triton 1024   0.0138     0.0140   0.0142     1092.8
+ triton 4096   0.0090     0.0092   0.0093     1660.8
+  check [512 x 59552] triton vs torch: PASS
+  check [512 x 59552] compiled vs torch: PASS
+
+rows 512, cols 59552, minimum traffic 121.96 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   0.2262     0.2285   0.2310      533.7
+    compiled   0.0770     0.0775   0.0781     1573.8
+  triton 512   0.1240     0.1247   0.1253      978.2
+ triton 1024   0.0810     0.0814   0.0819     1497.8
+ triton 4096   0.0626     0.0629   0.0635     1937.6
+
+====================================================================================================
+4. Fused DE objective kernel (de_kernel.py) on the saved fixed state
+====================================================================================================
+state results/de_state_2026-10-26.npz: population [512, 5], vertices 7444, exported at commit 8630c9cbf786027f145d66079a7a7224b8017ec5 on NVIDIA GeForce RTX 4060 Ti |  610.88
+saved Triton reference config: {'BLOCK_P': 8, 'BLOCK_V': 128, 'num_warps': 4, 'fused_strain': True}
+
+Correctness
+  PyTorch reference on this GPU vs saved torch: expected change max rel diff 2.016e-04, fitness 6.254e-05, argmin 237
+  Triton P8 V128 w4: expected change max rel diff vs saved torch 1.097e-04, vs saved JAX 1.134e-04; fitness max rel diff vs saved JAX 3.695e-05; argmin 237 (saved torch 237, JAX 237) -> PASS
+    bitwise equal to the saved Triton output (expected only on the export GPU): fitness False, expected change False
+
+Sweep: ms per call, 200 calls back to back, 7 repeats; max rel diff of the expected change vs saved torch
+          config  programs  regs spills      q25   median      q75  max rel diff   ok
+      P1 V512 w4       512   100      0    0.210    0.210    0.210     1.093e-04  yes
+      P4 V128 w4       128    92      0    0.222    0.222    0.222     1.097e-04  yes
+      P8 V128 w4        64   152      0    0.297    0.297    0.297     1.097e-04  yes
+      P8 V128 w8        64    92      0    0.329    0.329    0.329     1.097e-04  yes
+/opt/venv/lib/python3.12/site-packages/torch/_inductor/compile_fx.py:320: UserWarning: TensorFloat32 tensor cores for float32 matrix multiplication available but not enabled. Consider setting `torch.set_float32_matmul_precision('high')` for better performance.
+  warnings.warn(
+
+kernel_info for P8 V128 w4: {'n_regs': 152, 'n_spills': 0, 'num_warps': 4, 'warp_size': 64, 'shared_bytes': 64, 'target': "GPUTarget(backend='hip', arch='gfx942', warp_size=64)"}
+fastest 5 (median ms): P1 V512 w4 0.210, P4 V128 w4 0.222, P8 V128 w4 0.297, P8 V128 w8 0.329
+
+Baselines on this GPU (same timing method)
+                       variant      q25   median      q75
+  check torch.compile vs eager reference (assert_close defaults): PASS
+      Triton P8 V128 w4, start    0.298    0.298    0.298
+Triton P4 V128 w4, eager strain    0.288    0.288    0.288
+                   torch eager    1.438    1.439    1.439
+                 torch.compile    0.411    0.412    0.412
+        Triton P8 V128 w4, end    0.297    0.297    0.297

@@ -1,0 +1,57 @@
+W1112 11:23:15.420242     660 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000660 sec
+W1112 11:23:15.420536     660 simple_timer.cpp:55] [rocprofv3] 'python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4' ::     0.000000 sec
+W1112 11:23:16.905590     660 tool.cpp:3082] HSA version 1.21.0 initialized (instance=0)
+W1112 11:23:17.500298     729 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000428 sec
+W1112 11:23:17.500572     729 simple_timer.cpp:55] [rocprofv3] '/bin/sh /sbin/ldconfig -p' ::     0.000000 sec
+GIT branch: W1112 11:23:16.764270     701 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000751 sec
+W1112 11:23:16.764575     701 simple_timer.cpp:55] [rocprofv3] 'git rev-parse --abbrev-ref HEAD' ::     0.000000 sec
+W1112 11:23:16.765482     701 simple_timer.cpp:55] [rocprofv3] output generation ::     0.000407 sec
+W1112 11:23:16.765546     701 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.000531 sec
+perf-study
+GIT commit: W1112 11:23:16.819237     704 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000672 sec
+W1112 11:23:16.819460     704 simple_timer.cpp:55] [rocprofv3] 'git rev-parse HEAD' ::     0.000000 sec
+W1112 11:23:16.820063     704 simple_timer.cpp:55] [rocprofv3] output generation ::     0.000272 sec
+W1112 11:23:16.820110     704 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.000373 sec
+74fd3ee0c5a449ef473c07fade541440583a9e98
+GIT dirty: unavailable (OSError)
+PyTorch version: 2.12.0+rocm7.14.1
+torch.version.cuda: None
+torch.version.hip: 7.14.60850
+GPU available: True
+GPU name: AMD Instinct MI300X VF
+GPU memory: 192 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 304
+props.gcnArchName: gfx942:sramecc+:xnack-
+props.warp_size: 64
+props.L2_cache_size: 4194304
+props.major: 9
+props.minor: 4
+GPU count: 1
+Triton version: 3.8.0
+pip triton / pytorch-triton-rocm: 3.8.0+git4cff872c.rocm7.14.1 / not installed
+/opt/rocm/.info/version: unavailable (FileNotFoundError)
+amd-smi version: W1112 11:23:16.982721     714 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000561 sec
+W1112 11:23:16.982963     714 simple_timer.cpp:55] [rocprofv3] '/opt/venv/bin/python /opt/venv/bin/amd-smi version' ::     0.000000 sec
+W1112 11:23:17.057018     714 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000463 sec
+W1112 11:23:17.057210     714 simple_timer.cpp:55] [rocprofv3] '/usr/bin/env python3 /opt/venv/lib/python3.12/site-packages/_rocm_sdk_core/bin/amd-smi version' ::     0.000000 sec
+W1112 11:23:17.103118     714 simple_timer.cpp:55] [rocprofv3] tool initialization ::     0.000647 sec
+W1112 11:23:17.103360     714 simple_timer.cpp:55] [rocprofv3] 'python3 /opt/venv/lib/python3.12/site-packages/_rocm_sdk_core/bin/amd-smi version' ::     0.000000 sec
+AMDSMI Tool: 26.5.0+ca887ee8 | AMDSMI Library version: 26.5.0 | ROCm version: 7.14.1 | amdgpu version: 6.19.14.31400000 | ionic version: N/A
+W1112 11:23:17.175593     714 simple_timer.cpp:55] [rocprofv3] 'python3 /opt/venv/lib/python3.12/site-packages/_rocm_sdk_core/bin/amd-smi version' ::     0.072233 sec
+W1112 11:23:17.176123     714 simple_timer.cpp:55] [rocprofv3] output generation ::     0.000416 sec
+W1112 11:23:17.176173     714 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.000531 sec
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.12.3
+OS: Linux-6.8.0-146-generic-x86_64-with-glibc2.39
+CPU: x86_64
+command args: {'state': 'results/de_state_2026-10-26.npz', 'only': 'vector_add,elementwise,lse,de', 'quick': False, 'profile': [8, 128, 4], 'profile_add': None, 'save_outputs': None}
+config: BLOCK_P 8, BLOCK_V 128, num_warps 4, strain in kernel; kernel_info {'n_regs': 152, 'n_spills': 0, 'num_warps': 4, 'warp_size': 64, 'shared_bytes': 64, 'target': "GPUTarget(backend='hip', arch='gfx942', warp_size=64)"}
+  P8 V128 w4: expected change max rel diff vs saved torch 1.097e-04, vs saved JAX 1.134e-04; fitness max rel diff vs saved JAX 3.695e-05; argmin 237 (saved torch 237, JAX 237) -> PASS
+    bitwise equal to the saved Triton output (expected only on the export GPU): fitness False, expected change False
+W1112 11:23:19.465457     660 simple_timer.cpp:55] [rocprofv3] 'python amd_run.py --state results/de_state_2026-10-26.npz --profile 8 128 4' ::     4.044919 sec
+E1112 11:23:19.479553     660 output_stream.cpp:111] Opened result file: results/amd_mi300x_2026-11-12/rocprofv3_de_P8V128w4/542ed3dfd010/660_kernel_stats.csv
+E1112 11:23:19.479804     660 output_stream.cpp:111] Opened result file: results/amd_mi300x_2026-11-12/rocprofv3_de_P8V128w4/542ed3dfd010/660_kernel_trace.csv
+E1112 11:23:19.484290     660 output_stream.cpp:111] Opened result file: results/amd_mi300x_2026-11-12/rocprofv3_de_P8V128w4/542ed3dfd010/660_agent_info.csv
+E1112 11:23:19.484504     660 output_stream.cpp:111] Opened result file: results/amd_mi300x_2026-11-12/rocprofv3_de_P8V128w4/542ed3dfd010/660_domain_stats.csv
+W1112 11:23:19.485791     660 simple_timer.cpp:55] [rocprofv3] output generation ::     0.017829 sec
+W1112 11:23:19.486376     660 simple_timer.cpp:55] [rocprofv3] tool finalization ::     0.018446 sec
