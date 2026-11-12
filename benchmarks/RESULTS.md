@@ -2,7 +2,7 @@
 
 Working log for a hands-on GPU performance study of [ABL (Adaptive Bayesian Localization)](https://github.com/lainem11/bayesian_localization). Each entry records the change or experiment, the hypothesis, the command, the numbers and the conclusion. Every number below comes from a file in `benchmarks/results/`. Where a number was derived by hand from such a file, the derivation is stated.
 
-**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is complete. Phase 4 (AMD/ROCm) is in progress: 4.1 (JAX-free kernels, saved state, tested on NVIDIA) is done.
+**Status:** Phase 0 (baseline), Phase 1 (profiling), and Phase 2 (framework-level optimization) are complete. Phase 3 (Triton) is complete. Phase 4 (Triton on an AMD MI300X, ROCm profilers) is complete.
 
 ## Setup
 
@@ -778,3 +778,111 @@ DE kernel, effect of `num_warps` (selected rows; regs = registers per thread fro
 - **Measurement caveat:** eager at 2²⁷ shows q25 = median = q75 = 53.0811 ms. `do_bench` repeats the call ⌊100 ms / estimated time⌋ times (`rep=100`; checked in the source of the installed Triton 3.7.0), so a 53 ms function is measured **once**. Quantiles of calls over ~50 ms are single samples.
 - The 15 MB logsumexp gave only the slow mode (≈0.083–0.095 ms) in this run.
 - DE: Triton is 10.2× faster than `torch.compile` and 27.4× faster than eager on this GPU (2.570 / 0.251 and 6.878 / 0.251, *derived*, same run).
+
+## 4.2 Triton kernels on an AMD Instinct MI300X: correctness and timing
+
+**Questions.** Does the same Triton code run correctly on AMD? How fast is it relative to that GPU's own peak? Does the DE kernel's best configuration carry over from NVIDIA?
+
+**Environment** (all files in `results/amd_mi300x_2026-11-12/` unless noted):
+- AMD Developer Cloud (DigitalOcean GPU Droplet), 1× **AMD Instinct MI300X VF** (an SR-IOV virtual function; firmware `MI300X_HW_SRIOV_CVS_1VF`), gfx942, 304 CUs, 192 GB HBM3, `MAX_BANDWIDTH: 5325 GB/s`, L2 4 MB, level-3 cache (Infinity Cache) 256 MB, max clock 2100 MHz (`02_gpu_info.txt`). Per CU: 4 SIMDs, at most 8 wavefronts per SIMD, 64 KB LDS (`rocprofv3_de_P8V128w4/542ed3dfd010/660_agent_info.csv`).
+- Container `rocm/pytorch:rocm7.14.1_ubuntu24.04_py3.12_pytorch_release_2.12.0` (digest `sha256:cc9b00f9…`): PyTorch 2.12.0+rocm7.14.1, Triton 3.8.0 (3.7.0 on the NVIDIA side), Python 3.12.3, ROCm 7.14.1 installed by pip under `/opt/venv` (no `/opt/rocm`) (`00_env_light.txt`, `01_versions.txt`).
+- Host: Ubuntu 24.04.5, ROCm 10.1.0 tools, amdgpu driver 6.19.14; the droplet's own Jupyter container was running alongside, idle at 0% GPU use when checked (`../amd_mi300x_2026-11-12_host.txt`).
+- Commit `74fd3ee`, `GIT dirty: False` in `10_smoke.txt`, `11_full.txt`, `40_full_repeat.txt`.
+- Droplet time and cost: *[to fill in: start/end time and billed amount]*.
+
+**Method.** In the container (started with the device flags of `AMD_SESSION.md` step 9), from `benchmarks/`:
+```
+bash amd_session.sh mi300x_2026-11-12
+```
+The script runs `amd_run.py` (all exercise kernels and the DE kernel from `results/de_state_2026-10-26.npz`, the state exported on the 4060 Ti in 4.1) as a smoke test, a full run and, after the profiler steps, a full repeat. Step durations and exit codes: `session_log.txt` (smoke 29 s, full 351 s, repeat 350 s; all exit 0). Pass criteria as before: exercise kernels bitwise or `assert_close`; DE expected change max relative difference < 1e-3 vs the saved PyTorch and JAX outputs and the same argmin.
+
+**Correctness: all checks PASS** in `11_full.txt` and `40_full_repeat.txt`; no code was changed for AMD.
+- Vector add bitwise equal to PyTorch at 5 sizes and 8 block sizes; elementwise chain within `assert_close` (max abs diff 1.907e-06); logsumexp at 3 sizes, and finite for inputs + 100 where the naive version is not.
+- DE, Triton P8 V128 w4: expected change max rel diff 1.097e-04 vs the saved PyTorch output, 1.134e-04 vs the saved JAX output; argmin 237 = saved PyTorch = saved JAX. All 80 sweep configurations pass. Not bitwise equal to the 4060 Ti output, as expected. For scale: the PyTorch reference itself differs by 2.016e-04 between the two GPUs.
+
+**Bandwidth kernels** (median ms; `11_full.txt` / `40_full_repeat.txt`; % of 5325 GB/s *derived*):
+
+| kernel | MI300X | % of peak | 4060 Ti, `amd_run_rtx4060ti_2026-10-26.txt` |
+|---|---|---:|---|
+| vector add 2²⁸ (3.2 GB), Triton BLOCK 1024 | 3904.9 / 3699.7 GB/s | 73 / 69 | 89% |
+| vector add 2²⁸, PyTorch `x + y` | 3901.8 / 3872.4 GB/s | 73 / 73 | – |
+| vector add 2²⁸, block sweep (BLOCK 128 … 16384) | 2535.2, then 3535–3788 GB/s | – | – |
+| elementwise 2²⁷: Triton / eager / compiled | 0.6469 / 3.1256 / 0.6272 ms | 62 / 13 / 64 | – |
+| logsumexp 976 MB: Triton 4096 / compiled | 0.3316 / 0.6876 ms (repeat 0.3357 / 0.6904) | 55 / 27 | 92% / – |
+
+**DE objective** (ms per call, 200 calls back to back, 7 repeats; `11_full.txt` section 4, repeat in `40_full_repeat.txt`):
+
+| variant | programs | regs | median ms (repeat) |
+|---|---:|---:|---:|
+| Triton **P2 V512 w8** (fastest of 80) | 256 | 88 | **0.090** (0.091) |
+| Triton P1 V512 w8 | 512 | 59 | 0.098 (0.098) |
+| Triton P2 V256 w4 | 256 | 88 | 0.112 (0.112) |
+| Triton P8 V128 w4 (best on the 4060 Ti) | 64 | 152 | 0.297 (0.297) |
+| Triton P4 V128 w4, strain in eager PyTorch | 128 | – | 0.289 (0.288) |
+| torch.compile | – | – | 0.413 (0.415) |
+| torch eager | – | – | 1.436 (1.441) |
+
+**Conclusions.**
+- **The Triton code is portable:** all kernels ran unmodified and passed every check against references from another vendor's GPU and from JAX.
+- **Vector add reaches 69–73% of the HBM peak** (*derived*), PyTorch's own add the same, so the Triton kernel is not the limit. The practical ceiling of this GPU was not measured (no reference benchmark such as `rocm_bandwidth_test` or BabelStream was run), so "73%" is relative to the data-sheet peak, not to what is achievable. Lower than on the 4060 Ti (89%).
+- **Elementwise:** Triton 4.8× over eager; `torch.compile` 3% faster than Triton (*derived*). Same pattern as on NVIDIA: Inductor fuses this chain as well as the hand-written kernel.
+- **Logsumexp at 976 MB:** Triton 2.07× faster than `torch.compile` (2.06× in the repeat; *derived*), as on the 4060 Ti (1.87×), but only 55% of peak, and still improving at the largest block tried (4096). *Hypothesis:* one program per row gives 512 programs for 304 CUs, too few loads in flight; not tested.
+- **The NVIDIA-tuned DE configuration does not carry over.** P8 V128 w4 takes 0.297 ms, slower than on the 4060 Ti (0.249 ms, 4.1); retuned, P2 V512 w8 takes 0.090 ms: **3.3× faster than the NVIDIA-tuned configuration, 4.6× faster than `torch.compile`, 16× faster than eager on the same GPU** (*derived*).
+- **Why** (interpretation, from launch geometry, not counters): P8 launches 64 workgroups (the trace in 4.3 confirms) for 304 CUs, so at least 240 CUs have no work. All five fastest configurations are P1 or P2 (256 or 512 workgroups). P2 beats P1 (0.090 vs 0.098 ms), *hypothesis:* each loaded vertex value is reused for 2 candidates instead of 1, so P2 balances parallelism against reuse. Configurations with many threads for a small tile are slow (P1 V64 w8: 0.579 ms); the fastest ones have 1–2 tile elements per thread (*derived pattern*).
+- **More bandwidth did not mean proportionally more speed for the fused DE kernel:** best MI300X 0.090 ms vs best 4060 Ti 0.249 ms (2.8×, *derived*) against an 18× ratio of peak bandwidth. On the 4060 Ti the kernel read only 4.81 MB from DRAM (3b.4), so it is not bandwidth-bound; its time depends on filling the GPU. Not a vendor comparison: different GPU classes, a virtualized GPU, different Triton versions.
+- **Launch overhead is a property of the host:** eager PyTorch 1.436 ms here vs 6.878 ms on the 4060 Ti (4.1); strain in eager costs ≈0.07 ms (0.289 vs 0.221 ms for fused P4 V128 w4 in the sweep, same file; *derived*) vs ≈0.29 ms in 3b.3. *Hypothesis:* native Linux and the server CPU launch kernels faster than WSL2 on the desktop; not separated. The strain-fusion trade-off of 3b.3 is therefore much smaller on this machine.
+- **Run-to-run:** DE timings agree within 1% between the full run and the repeat, and their IQRs are below 1 µs. Vector add at 2²⁸ varies by up to 5% between runs, with wide IQRs (e.g. 0.82–0.94 ms).
+
+## 4.3 ROCm profilers on the MI300X
+
+**Plan:** rocprofv3 kernel traces (times, registers, launch geometry), rocprofv3 hardware counters, and rocprof-compute (the full counter-based analysis, AMD's counterpart of Nsight Compute). Same session and files as 4.2.
+
+**How rocprofv3 works.** `rocprofv3 [options] -- <program>` runs the program with the rocprofiler-sdk tool library injected (preloaded through the environment, so child processes such as our `git` calls get it too; see `20_*.txt`). `--kernel-trace` records one row per kernel launch from the runtime, without hardware counters; `--stats` adds per-kernel aggregates; `--pmc` reads hardware counters through the aqlprofile library. With `--output-directory DIR` the files go to `DIR/<hostname>/<pid>_*.csv` (default pattern `%hostname%/%pid%`, `03_tools.txt`); in the container the hostname is the container ID, e.g. `rocprofv3_de_P8V128w4/542ed3dfd010/660_kernel_trace.csv`, plus `_kernel_stats.csv`, `_domain_stats.csv`, `_agent_info.csv`.
+
+**Commands** (from `amd_session.sh`; each profiled program runs 3 kernel calls, plus 1 from `kernel_info()` for the DE kernel):
+```
+rocprofv3 --kernel-trace --stats --output-format csv --output-directory DIR -- python amd_run.py --state ... --profile 8 128 4   # also 2 512 8
+rocprofv3 --kernel-trace --stats --output-format csv --output-directory DIR -- python amd_run.py --state ... --profile-add 28 4096
+rocprofv3 --pmc SQ_WAVES GRBM_GUI_ACTIVE --output-format csv --output-directory DIR -- python amd_run.py --state ... --profile 8 128 4
+rocprof-compute profile --name NAME -k KERNEL [--no-roof] -- python amd_run.py ...
+```
+
+**Results: kernel traces worked** (`rocprofv3_*/542ed3dfd010/`; exit 0, 4 s each in `session_log.txt`):
+
+| | DE P8 V128 w4 (`660_*`) | DE P2 V512 w8 (`746_*`) | vector add 2²⁸ (`829_*`) |
+|---|---:|---:|---:|
+| calls; AverageNs (`kernel_stats.csv`) | 4; 299836.75 | 4; 91977.25 | 3; 915731 |
+| Workgroup_Size_X (`kernel_trace.csv`) | 256 | 512 | 256 |
+| Grid_Size_X (threads) | 16384 | 131072 | 16777216 |
+| VGPR_Count + Accum_VGPR_Count; SGPR | 24 + 128; 96 | 88 + 0; 96 | 36 + 4; 32 |
+| Scratch_Size, LDS_Block_Size | 0, 0 | 0, 0 | 0, 0 |
+
+- **Kernel times agree with the harness:** 299.8 µs vs 0.297 ms, 92.0 µs vs 0.090 ms. Vector add: 1.149, 0.810, 0.788 ms per call (first call slowest; cause not investigated).
+- **`num_warps` counts 64-thread wavefronts on AMD:** workgroup = `num_warps` × 64 (4 → 256, 8 → 512); Triton's `kernel_info` also reports `warp_size: 64` (`11_full.txt`). The same `num_warps=4` gives 128 threads per program on NVIDIA and 256 on AMD.
+- **Grid / workgroup = programs** (64, 256), matching the sweep's `programs` column.
+- **Triton's `n_regs` on AMD = VGPR + accumulation VGPR (AGPR):** 152 = 24 + 128, 88 = 88 + 0. AGPRs are the second register file meant for matrix-core (MFMA) instructions; P8 V128 w4 kept 128 values there with no scratch (memory) spills. *Interpretation:* the compiler used AGPRs as extra storage instead of spilling to memory.
+
+**Results: counters failed.**
+- `rocprofv3 --pmc` (`22_rocprofv3_pmc_de.txt`): `aqlprofile API table load failed: HSA_STATUS_ERROR: A generic error has occurred.` about 3 s after start, then SIGABRT; the abort handler hung with 0% GPU use, and the step was killed by hand after 1676 s (`exit 137`, `session_log.txt`). The counter names were valid: `SQ_WAVES` and `GRBM_GUI_ACTIVE` are among the 479 counters listed by `rocprofv3 -L` (`04_counters.txt`; `rocprofv3-avail list` failed first on a missing `librocprofv3-list-avail.so`). Listing counters works; collecting them does not.
+- `rocprof-compute` is not installed in this image (`03_tools.txt`; `30_*.txt`: `command not found`, exit 127).
+- Follow-up checks on the host (`../amd_mi300x_2026-11-12_host.txt`): the droplet's own `rocm` container has neither PyTorch nor rocprofv3, so the counter test could not be repeated there. A run with `--privileged` was not done.
+
+**Conclusions.**
+- **rocprofv3 kernel tracing is usable and cheap** (4 s per run): kernel times, launch geometry and register use, enough to confirm the 4.2 interpretation (64 vs 256 workgroups) and what `num_warps` and `n_regs` mean on AMD.
+- **No counter-based measurement on AMD** (occupancy, HBM traffic, cache hit rates): the 4.2 explanation of the DE results rests on launch geometry, not counters, and the MI300X has no counterpart of the ncu numbers of 3b.4.
+- **Cause of the counter failure unknown.** *Hypotheses, none tested:* (a) counter access restricted on an SR-IOV virtual function (an AMD virtualization guide that was checked says nothing either way); (b) the container's ROCm 7.14.1 vs the host's 10.1.0 tools (same amdgpu driver, which weakens this); (c) missing container privileges. A short `--privileged` run would separate (c).
+- **Process lesson:** the per-step timeout (30 min) was too long for a step that should take seconds; a 2-minute limit for profiler steps would have saved about 26 billed minutes (*derived*: 1676 s − 120 s).
+
+## Phase 4 summary
+
+**Can claim:**
+- Ran the Phase 3 Triton kernels unmodified on an AMD Instinct MI300X (ROCm 7.14.1, PyTorch 2.12, Triton 3.8); all passed correctness checks against references saved from NVIDIA and JAX.
+- Measured bandwidth relative to the MI300X's peak: vector add 69–73%, Triton logsumexp 55% at 976 MB and 2.1× faster than `torch.compile`.
+- Retuned the fused DE kernel for the MI300X: 0.090 ms, 3.3× faster than the NVIDIA-tuned configuration, 4.6× faster than `torch.compile` and 16× faster than eager on the same GPU; explained by workgroups vs 304 CUs, data reuse and 64-thread wavefronts, and confirmed with rocprofv3 kernel traces (times, registers, launch geometry).
+- Prepared a JAX-free, scripted, failure-tolerant cloud session (state export, light environment record, one session script) that completed in one cloud session with every non-profiler step passing.
+
+**Cannot claim (yet):**
+- Counter-based AMD profiling (occupancy, HBM traffic) or any rocprof-compute analysis; the counter collection failed, cause unknown.
+- An AMD vs NVIDIA comparison (different GPU classes, virtualized GPU, different Triton versions).
+- HIP kernels: all GPU code is Triton.
+- What bandwidth the MI300X can practically reach (no reference benchmark).
