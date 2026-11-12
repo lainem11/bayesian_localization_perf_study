@@ -1,0 +1,23 @@
+GIT branch: perf-study
+GIT commit: b96a76b7c05ec8e1f53ff8a1eb3da2d8db256734
+GIT dirty: False
+PyTorch version: 2.12.0+cu126
+torch.version.cuda: 12.6
+torch.version.hip: None
+GPU available: True
+GPU name: NVIDIA GeForce RTX 4060 Ti
+GPU memory: 16 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 34
+props.gcnArchName: NVIDIA GeForce RTX 4060 Ti
+props.warp_size: 32
+props.L2_cache_size: 33554432
+props.major: 8
+props.minor: 9
+GPU count: 1
+Triton version: 3.7.0
+pip triton / pytorch-triton-rocm: 3.7.0 / not installed
+nvidia-smi: NVIDIA GeForce RTX 4060 Ti, 610.88
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.13.16
+OS: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+CPU: not reported

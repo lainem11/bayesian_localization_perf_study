@@ -1,0 +1,15 @@
+Python 3.13.16
+numpy                     2.4.4
+numpyro                   0.20.1
+torch                     2.12.0+cu126
+torchvision               0.27.0+cu126
+triton                    3.7.0
+ls: cannot access '/opt/rocm*': No such file or directory
+cat: /opt/rocm/.info/version: No such file or directory
+Linux DESKTOP-VQ71Q87 6.18.54.1-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Tue Oct  6 19:13:07 UTC 2026 x86_64 GNU/Linux
+16
+               total        used        free      shared  buff/cache   available
+Mem:              15           3          10           0           1          12
+Swap:              4           0           4
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sdd       1007G   32G  925G   4% /

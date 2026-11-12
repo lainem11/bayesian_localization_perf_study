@@ -1,0 +1,3 @@
+bash: line 1: rocprofv3: command not found
+bash: line 1: rocprof-compute: command not found
+bash: line 1: rocprof-compute: command not found

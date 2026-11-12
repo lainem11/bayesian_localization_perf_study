@@ -1,0 +1,2 @@
+bash: line 1: rocprofv3-avail: command not found
+bash: line 1: rocprofv3: command not found

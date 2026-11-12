@@ -1,0 +1,220 @@
+GIT branch: perf-study
+GIT commit: b96a76b7c05ec8e1f53ff8a1eb3da2d8db256734
+GIT dirty: False
+PyTorch version: 2.12.0+cu126
+torch.version.cuda: 12.6
+torch.version.hip: None
+GPU available: True
+GPU name: NVIDIA GeForce RTX 4060 Ti
+GPU memory: 16 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 34
+props.gcnArchName: NVIDIA GeForce RTX 4060 Ti
+props.warp_size: 32
+props.L2_cache_size: 33554432
+props.major: 8
+props.minor: 9
+GPU count: 1
+Triton version: 3.7.0
+pip triton / pytorch-triton-rocm: 3.7.0 / not installed
+nvidia-smi: NVIDIA GeForce RTX 4060 Ti, 610.88
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.13.16
+OS: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+CPU: not reported
+command args: {'state': 'results/de_state_2026-10-26.npz', 'only': 'vector_add,elementwise,lse,de', 'quick': False, 'profile': None, 'profile_add': None, 'save_outputs': None}
+
+====================================================================================================
+1. Vector add (triton_vector_add.py kernel); GB/s = 3 x n x 4 bytes / median time
+====================================================================================================
+         n  MB moved  triton1024 ms    GB/s  triton4096 ms    GB/s  torch ms    GB/s
+  check n=2^20 bitwise vs torch: PASS
+   1048576     12.58         0.0568   221.5         0.0573   219.4    0.0573   219.4
+  check n=2^22 bitwise vs torch: PASS
+   4194304     50.33         0.2156   233.5         0.2171   231.8    0.2130   236.3
+  check n=2^24 bitwise vs torch: PASS
+  16777216    201.33         0.8182   246.1         0.8151   247.0    0.8182   246.1
+  check n=2^26 bitwise vs torch: PASS
+  67108864    805.31         3.2010   251.6         3.1805   253.2    3.2430   248.3
+  check n=2^28 bitwise vs torch: PASS
+ 268435456   3221.23        12.6843   254.0        12.5993   255.7   12.8123   251.4
+
+Block-size sweep, n = 2^28 (3221.2 MB moved)
+ BLOCK  programs num_warps   q25 ms  median ms   q75 ms  GB/s (median)
+  check BLOCK 128 bitwise: PASS
+   128   2097152         4  13.0202    13.1738  13.2628          244.5
+  check BLOCK 256 bitwise: PASS
+   256   1048576         4  12.7785    12.8338  13.0888          251.0
+  check BLOCK 512 bitwise: PASS
+   512    524288         4  12.8645    12.8737  13.1323          250.2
+  check BLOCK 1024 bitwise: PASS
+  1024    262144         4  12.8215    12.8451  13.1261          250.8
+  check BLOCK 2048 bitwise: PASS
+  2048    131072         4  12.8686    12.8952  13.1533          249.8
+  check BLOCK 4096 bitwise: PASS
+  4096     65536         4  12.7519    12.9065  12.9756          249.6
+  check BLOCK 8192 bitwise: PASS
+  8192     32768         4  12.5655    12.6126  12.7565          255.4
+  check BLOCK 16384 bitwise: PASS
+ 16384     16384         4  12.7616    13.0929  13.1261          246.0
+warp size reported by the compiled kernel: 32
+
+====================================================================================================
+2. Fused elementwise chain (triton_fused_elementwise.py); eff. GB/s counts 16 bytes per element
+====================================================================================================
+  check triton vs eager (assert_close defaults): PASS
+  triton vs eager: bitwise-equal fraction 0.598068, max abs diff 1.907e-06
+  check compiled vs eager (assert_close defaults): PASS
+  compiled vs eager: bitwise-equal fraction 0.762889, max abs diff 9.537e-07
+
+n = 2^27, minimum traffic 2147.5 MB
+  variant   q25 ms  median ms   q75 ms  eff. GB/s
+   triton   8.1523     8.1828   8.2191      262.4
+    eager  47.7274    47.8039  47.8804       44.9
+ compiled   8.1516     8.2104   8.2757      261.6
+
+====================================================================================================
+3. Row-wise online logsumexp (triton_logsumexp.py); one program per row
+====================================================================================================
+  check [512 x 7444] triton vs torch: PASS
+  stability (x + 100): naive finite = False, triton finite = True, max abs diff vs torch = 7.629e-06
+  check [512 x 7444] compiled vs torch: PASS
+
+rows 512, cols 7444, minimum traffic 15.25 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   0.1751     0.2048   0.2058       74.5
+    compiled   0.0840     0.0850   0.0850      179.4
+  triton 256   0.0942     0.0952   0.0952      160.1
+  triton 512   0.0858     0.0860   0.0870      177.3
+ triton 1024   0.0840     0.0840   0.0850      181.6
+ triton 2048   0.0829     0.0840   0.0840      181.6
+ triton 4096   0.0829     0.0840   0.0850      181.6
+  check [512 x 59552] triton vs torch: PASS
+  check [512 x 59552] compiled vs torch: PASS
+
+rows 512, cols 59552, minimum traffic 121.96 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   2.9563     2.9676   3.0198       41.1
+    compiled   0.5837     0.5868   0.5908      207.9
+  triton 256   0.5888     0.5919   0.5942      206.1
+  triton 512   0.5478     0.5489   0.5540      222.2
+ triton 1024   0.5427     0.5443   0.5458      224.1
+ triton 2048   0.5427     0.5437   0.5448      224.3
+ triton 4096   0.5437     0.5448   0.5468      223.9
+  check [512 x 476416] triton vs torch: PASS
+  check [512 x 476416] compiled vs torch: PASS
+
+rows 512, cols 476416, minimum traffic 975.70 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager  23.2658    23.3533  23.3920       41.8
+    compiled   6.8280     6.8506   6.9635      142.4
+  triton 256   4.3474     4.5046   4.5496      216.6
+  triton 512   3.6846     3.6915   3.7304      264.3
+ triton 1024   3.6588     3.6618   3.6803      266.5
+ triton 2048   3.6588     3.6639   3.6751      266.3
+ triton 4096   3.6588     3.6659   3.6977      266.2
+
+====================================================================================================
+4. Fused DE objective kernel (de_kernel.py) on the saved fixed state
+====================================================================================================
+state results/de_state_2026-10-26.npz: population [512, 5], vertices 7444, exported at commit 8630c9cbf786027f145d66079a7a7224b8017ec5 on NVIDIA GeForce RTX 4060 Ti |  610.88
+saved Triton reference config: {'BLOCK_P': 8, 'BLOCK_V': 128, 'num_warps': 4, 'fused_strain': True}
+
+Correctness
+  PyTorch reference on this GPU vs saved torch: expected change max rel diff 0.000e+00, fitness 0.000e+00, argmin 237
+  Triton P8 V128 w4: expected change max rel diff vs saved torch 4.824e-05, vs saved JAX 1.133e-04; fitness max rel diff vs saved JAX 3.218e-05; argmin 237 (saved torch 237, JAX 237) -> PASS
+    bitwise equal to the saved Triton output (expected only on the export GPU): fitness True, expected change True
+
+Sweep: ms per call, 200 calls back to back, 7 repeats; max rel diff of the expected change vs saved torch
+          config  programs  regs spills      q25   median      q75  max rel diff   ok
+       P1 V64 w1       512    80      0    0.475    0.475    0.476     6.503e-05  yes
+       P1 V64 w2       512    96      0    0.440    0.441    0.447     6.503e-05  yes
+       P1 V64 w4       512    96      0    0.914    0.917    0.919     6.503e-05  yes
+       P1 V64 w8       512   104      0    1.769    1.771    1.787     6.503e-05  yes
+      P1 V128 w1       512   118      0    0.722    0.723    0.725     1.768e-04  yes
+      P1 V128 w2       512    80      0    1.189    1.190    1.191     1.768e-04  yes
+      P1 V128 w4       512    96      0    0.485    0.486    0.487     4.824e-05  yes
+      P1 V128 w8       512   104      0    0.933    0.933    0.935     4.824e-05  yes
+      P1 V256 w1       512   145      0    0.988    0.989    0.990     1.768e-04  yes
+      P1 V256 w2       512    96      0    0.953    0.954    0.956     1.769e-04  yes
+      P1 V256 w4       512    80      0    0.894    0.894    0.896     1.767e-04  yes
+      P1 V256 w8       512    80      0    0.885    0.886    0.888     1.767e-04  yes
+      P1 V512 w1       512   214      0    0.648    0.649    0.651     1.767e-04  yes
+      P1 V512 w2       512   149      0    0.886    0.905    0.908     1.767e-04  yes
+      P1 V512 w4       512    96      0    0.829    0.836    0.848     1.768e-04  yes
+      P1 V512 w8       512   128      2    1.147    1.150    1.156     1.768e-04  yes
+       P2 V64 w1       256    96      0    0.346    0.349    0.356     6.503e-05  yes
+       P2 V64 w2       256    96      0    0.354    0.356    0.357     6.503e-05  yes
+       P2 V64 w4       256    96      0    0.563    0.571    0.574     6.503e-05  yes
+       P2 V64 w8       256   128      0    1.092    1.097    1.101     6.503e-05  yes
+      P2 V128 w1       256   148      0    0.556    0.562    0.564     1.768e-04  yes
+      P2 V128 w2       256   128      4    0.571    0.579    0.582     1.768e-04  yes
+      P2 V128 w4       256    96      0    0.401    0.404    0.408     4.824e-05  yes
+      P2 V128 w8       256   128      0    0.553    0.559    0.568     4.824e-05  yes
+      P2 V256 w1       256   168      6    0.437    0.440    0.442     1.768e-04  yes
+      P2 V256 w2       256   128      4    0.455    0.463    0.469     1.769e-04  yes
+      P2 V256 w4       256   128      4    0.596    0.600    0.610     1.767e-04  yes
+      P2 V256 w8       256   128      0    0.370    0.373    0.374     1.767e-04  yes
+      P2 V512 w1       256   255    272    0.525    0.526    0.527     1.767e-04  yes
+      P2 V512 w2       256   168      6    0.664    0.665    0.666     1.767e-04  yes
+      P2 V512 w4       256   128      6    0.443    0.444    0.445     1.768e-04  yes
+      P2 V512 w8       256   128      2    0.647    0.648    0.649     1.768e-04  yes
+       P4 V64 w1       128   128      0    0.304    0.306    0.308     6.503e-05  yes
+       P4 V64 w2       128    96      0    0.310    0.311    0.312     6.503e-05  yes
+       P4 V64 w4       128   128      0    0.331    0.331    0.333     6.503e-05  yes
+       P4 V64 w8       128   128      0    0.533    0.534    0.536     6.503e-05  yes
+      P4 V128 w1       128   168      0    0.570    0.573    0.574     1.768e-04  yes
+      P4 V128 w2       128   128      2    0.595    0.597    0.597     1.768e-04  yes
+      P4 V128 w4       128    96      0    0.277    0.278    0.279     4.824e-05  yes
+      P4 V128 w8       128   128      0    0.366    0.367    0.370     4.824e-05  yes
+      P4 V256 w1       128   255      4    0.574    0.577    0.577     1.768e-04  yes
+      P4 V256 w2       128   148      0    0.387    0.388    0.389     1.769e-04  yes
+      P4 V256 w4       128   128      2    0.367    0.369    0.370     1.767e-04  yes
+      P4 V256 w8       128   126      0    0.299    0.299    0.300     1.767e-04  yes
+      P4 V512 w1       128   255    822    0.922    0.924    0.926     1.767e-04  yes
+      P4 V512 w2       128   255      6    0.342    0.343    0.347     1.767e-04  yes
+      P4 V512 w4       128   148      0    0.452    0.453    0.454     1.768e-04  yes
+      P4 V512 w8       128   128      2    0.385    0.385    0.386     1.768e-04  yes
+       P8 V64 w1        64   244      0    0.406    0.408    0.414     6.503e-05  yes
+       P8 V64 w2        64   128      0    0.345    0.346    0.347     6.503e-05  yes
+       P8 V64 w4        64   128      0    0.330    0.333    0.333     6.503e-05  yes
+       P8 V64 w8        64   128      0    0.353    0.359    0.360     6.503e-05  yes
+      P8 V128 w1        64   255      0    1.042    1.051    1.059     1.768e-04  yes
+      P8 V128 w2        64   255      0    0.647    0.659    0.661     1.768e-04  yes
+      P8 V128 w4        64   128      0    0.250    0.251    0.252     4.824e-05  yes
+      P8 V128 w8        64   128      0    0.284    0.284    0.291     4.824e-05  yes
+      P8 V256 w1        64   255    568    1.534    1.537    1.542     1.768e-04  yes
+      P8 V256 w2        64   255      6    0.584    0.586    0.587     1.769e-04  yes
+      P8 V256 w4        64   255      0    0.384    0.385    0.385     1.767e-04  yes
+      P8 V256 w8        64   222      0    0.336    0.336    0.336     1.767e-04  yes
+      P8 V512 w1        64   255   1626    1.619    1.620    1.621     1.767e-04  yes
+      P8 V512 w2        64   255    638    0.833    0.834    0.837     1.767e-04  yes
+      P8 V512 w4        64   255      6    0.311    0.311    0.312     1.768e-04  yes
+      P8 V512 w8        64   255      0    0.431    0.432    0.436     1.768e-04  yes
+      P16 V64 w1        32   255     38    1.502    1.516    1.531     6.503e-05  yes
+      P16 V64 w2        32   253      0    0.508    0.508    0.509     6.503e-05  yes
+      P16 V64 w4        32   168      0    0.356    0.356    0.357     6.503e-05  yes
+      P16 V64 w8        32   128      0    0.364    0.365    0.365     6.503e-05  yes
+     P16 V128 w1        32   255    520    2.907    2.908    2.910     1.768e-04  yes
+     P16 V128 w2        32   255      8    1.081    1.081    1.082     1.768e-04  yes
+     P16 V128 w4        32   255      0    0.320    0.321    0.323     4.824e-05  yes
+     P16 V128 w8        32   214      0    0.288    0.289    0.291     4.824e-05  yes
+     P16 V256 w1        32   255   1414    3.005    3.010    3.024     1.768e-04  yes
+     P16 V256 w2        32   255    464    1.621    1.635    1.650     1.769e-04  yes
+     P16 V256 w4        32   255      8    0.575    0.576    0.581     1.767e-04  yes
+     P16 V256 w8        32   253      0    0.269    0.270    0.272     1.767e-04  yes
+     P16 V512 w1        32   168   3492    3.526    3.526    3.532     1.767e-04  yes
+     P16 V512 w2        32   255    912    1.513    1.515    1.516     1.767e-04  yes
+     P16 V512 w4        32   255    460    0.854    0.854    0.855     1.768e-04  yes
+     P16 V512 w8        32   255      8    0.312    0.313    0.314     1.768e-04  yes
+
+kernel_info for P8 V128 w4: {'n_regs': 128, 'n_spills': 0, 'num_warps': 4, 'warp_size': 32, 'shared_bytes': 128, 'target': "GPUTarget(backend='cuda', arch=89, warp_size=32)"}
+fastest 5 (median ms): P8 V128 w4 0.251, P16 V256 w8 0.270, P4 V128 w4 0.278, P8 V128 w8 0.284, P16 V128 w8 0.289
+
+Baselines on this GPU (same timing method)
+                       variant      q25   median      q75
+  check torch.compile vs eager reference (assert_close defaults): PASS
+      Triton P8 V128 w4, start    0.249    0.250    0.252
+Triton P4 V128 w4, eager strain    0.531    0.532    0.542
+                   torch eager    6.897    6.899    6.907
+                 torch.compile    2.586    2.588    2.591
+        Triton P8 V128 w4, end    0.249    0.249    0.250

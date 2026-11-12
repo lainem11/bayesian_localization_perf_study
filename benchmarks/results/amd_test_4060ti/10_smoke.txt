@@ -1,0 +1,114 @@
+GIT branch: perf-study
+GIT commit: b96a76b7c05ec8e1f53ff8a1eb3da2d8db256734
+GIT dirty: False
+PyTorch version: 2.12.0+cu126
+torch.version.cuda: 12.6
+torch.version.hip: None
+GPU available: True
+GPU name: NVIDIA GeForce RTX 4060 Ti
+GPU memory: 16 GiB
+multiprocessors (SMs on NVIDIA, CUs on AMD): 34
+props.gcnArchName: NVIDIA GeForce RTX 4060 Ti
+props.warp_size: 32
+props.L2_cache_size: 33554432
+props.major: 8
+props.minor: 9
+GPU count: 1
+Triton version: 3.7.0
+pip triton / pytorch-triton-rocm: 3.7.0 / not installed
+nvidia-smi: NVIDIA GeForce RTX 4060 Ti, 610.88
+HIP_VISIBLE_DEVICES / CUDA_VISIBLE_DEVICES: None / None
+Python version: 3.13.16
+OS: Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43
+CPU: not reported
+command args: {'state': 'results/de_state_2026-10-26.npz', 'only': 'vector_add,elementwise,lse,de', 'quick': True, 'profile': None, 'profile_add': None, 'save_outputs': None}
+
+====================================================================================================
+1. Vector add (triton_vector_add.py kernel); GB/s = 3 x n x 4 bytes / median time
+====================================================================================================
+         n  MB moved  triton1024 ms    GB/s  triton4096 ms    GB/s  torch ms    GB/s
+  check n=2^20 bitwise vs torch: PASS
+   1048576     12.58         0.0614   204.8         0.0573   219.4    0.0614   204.8
+  check n=2^24 bitwise vs torch: PASS
+  16777216    201.33         0.8259   243.8         0.8233   244.5    0.8274   243.3
+
+Block-size sweep, n = 2^24 (201.3 MB moved)
+ BLOCK  programs num_warps   q25 ms  median ms   q75 ms  GB/s (median)
+  check BLOCK 256 bitwise: PASS
+   256     65536         4   0.8294     0.8397   0.8530          239.8
+  check BLOCK 1024 bitwise: PASS
+  1024     16384         4   0.8141     0.8233   0.8402          244.5
+  check BLOCK 4096 bitwise: PASS
+  4096      4096         4   0.8120     0.8161   0.8361          246.7
+  check BLOCK 16384 bitwise: PASS
+ 16384      1024         4   0.8079     0.8151   0.8315          247.0
+warp size reported by the compiled kernel: 32
+
+====================================================================================================
+2. Fused elementwise chain (triton_fused_elementwise.py); eff. GB/s counts 16 bytes per element
+====================================================================================================
+  check triton vs eager (assert_close defaults): PASS
+  triton vs eager: bitwise-equal fraction 0.598159, max abs diff 9.537e-07
+  check compiled vs eager (assert_close defaults): PASS
+  compiled vs eager: bitwise-equal fraction 0.763066, max abs diff 9.537e-07
+
+n = 2^22, minimum traffic 67.1 MB
+  variant   q25 ms  median ms   q75 ms  eff. GB/s
+   triton   0.2806     0.2826   0.2867      237.4
+    eager   1.0696     1.0865   1.0967       61.8
+ compiled   0.2816     0.2836   0.2875      236.6
+
+====================================================================================================
+3. Row-wise online logsumexp (triton_logsumexp.py); one program per row
+====================================================================================================
+  check [512 x 7444] triton vs torch: PASS
+  stability (x + 100): naive finite = False, triton finite = True, max abs diff vs torch = 7.629e-06
+  check [512 x 7444] compiled vs torch: PASS
+
+rows 512, cols 7444, minimum traffic 15.25 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   0.2048     0.2058   0.2079       74.1
+    compiled   0.0829     0.0840   0.0860      181.6
+  triton 512   0.0850     0.0860   0.0870      177.3
+ triton 1024   0.0829     0.0840   0.0850      181.6
+ triton 4096   0.0829     0.0840   0.0840      181.6
+  check [512 x 59552] triton vs torch: PASS
+  check [512 x 59552] compiled vs torch: PASS
+
+rows 512, cols 59552, minimum traffic 121.96 MB
+     variant   q25 ms  median ms   q75 ms  eff. GB/s
+ torch eager   2.9624     2.9911   3.0003       40.8
+    compiled   0.5837     0.5868   0.5906      207.9
+  triton 512   0.5478     0.5509   0.5540      221.4
+ triton 1024   0.5427     0.5448   0.5478      223.9
+ triton 4096   0.5437     0.5458   0.5489      223.5
+
+====================================================================================================
+4. Fused DE objective kernel (de_kernel.py) on the saved fixed state
+====================================================================================================
+state results/de_state_2026-10-26.npz: population [512, 5], vertices 7444, exported at commit 8630c9cbf786027f145d66079a7a7224b8017ec5 on NVIDIA GeForce RTX 4060 Ti |  610.88
+saved Triton reference config: {'BLOCK_P': 8, 'BLOCK_V': 128, 'num_warps': 4, 'fused_strain': True}
+
+Correctness
+  PyTorch reference on this GPU vs saved torch: expected change max rel diff 0.000e+00, fitness 0.000e+00, argmin 237
+  Triton P8 V128 w4: expected change max rel diff vs saved torch 4.824e-05, vs saved JAX 1.133e-04; fitness max rel diff vs saved JAX 3.218e-05; argmin 237 (saved torch 237, JAX 237) -> PASS
+    bitwise equal to the saved Triton output (expected only on the export GPU): fitness True, expected change True
+
+Sweep: ms per call, 200 calls back to back, 7 repeats; max rel diff of the expected change vs saved torch
+          config  programs  regs spills      q25   median      q75  max rel diff   ok
+      P1 V512 w4       512    96      0    0.827    0.843    0.843     1.768e-04  yes
+      P4 V128 w4       128    96      0    0.276    0.277    0.277     4.824e-05  yes
+      P8 V128 w4        64   128      0    0.249    0.250    0.251     4.824e-05  yes
+      P8 V128 w8        64   128      0    0.282    0.282    0.283     4.824e-05  yes
+
+kernel_info for P8 V128 w4: {'n_regs': 128, 'n_spills': 0, 'num_warps': 4, 'warp_size': 32, 'shared_bytes': 128, 'target': "GPUTarget(backend='cuda', arch=89, warp_size=32)"}
+fastest 5 (median ms): P8 V128 w4 0.250, P4 V128 w4 0.277, P8 V128 w8 0.282, P1 V512 w4 0.843
+
+Baselines on this GPU (same timing method)
+                       variant      q25   median      q75
+  check torch.compile vs eager reference (assert_close defaults): PASS
+      Triton P8 V128 w4, start    0.249    0.249    0.250
+Triton P4 V128 w4, eager strain    0.565    0.571    0.578
+                   torch eager    6.922    6.924    7.046
+                 torch.compile    2.588    2.590    2.591
+        Triton P8 V128 w4, end    0.248    0.248    0.250

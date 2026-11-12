@@ -1,0 +1,20 @@
+commit b96a76b7c05ec8e1f53ff8a1eb3da2d8db256734, status (excluding results/): ''
+=== 2026-10-26T16:53:54+02:00 00_env_light: python env_light.py
+    exit 0, 4 s
+=== 2026-10-26T16:53:58+02:00 01_versions: bash -c python --version; python -m pip list 2>/dev/null | grep -i -E 'torch|triton|numpy';                              ls -d /opt/rocm*; cat /opt/rocm/.info/version; uname -a; nproc; free -g; df -h .
+    exit 0, 0 s
+=== 2026-10-26T16:53:58+02:00 02_gpu_info: bash -c amd-smi static || rocm-smi --showall || nvidia-smi
+    exit 0, 0 s
+=== 2026-10-26T16:53:58+02:00 03_tools: bash -c which rocprofv3 rocprof-compute rocprofv3-avail; rocprofv3 --help;                              rocprof-compute --version; rocprof-compute profile --help
+    exit 127, 1 s
+=== 2026-10-26T16:53:59+02:00 04_counters: bash -c rocprofv3-avail list || rocprofv3 -L
+    exit 127, 0 s
+=== 2026-10-26T16:53:59+02:00 10_smoke: python amd_run.py --state results/de_state_2026-10-26.npz --quick
+    exit 0, 29 s
+=== 2026-10-26T16:54:28+02:00 11_full: python amd_run.py --state results/de_state_2026-10-26.npz --save-outputs results/amd_test_4060ti/de_outputs.npz
+    exit 0, 348 s
+fastest DE config on this GPU: P8V128w4
+SKIP_PROFILERS=1: profiler steps skipped
+=== 2026-10-26T17:00:16+02:00 40_full_repeat: python amd_run.py --state results/de_state_2026-10-26.npz
+    exit 0, 111 s
+done: results/amd_test_4060ti.tar.gz (16K)
